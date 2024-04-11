@@ -40,6 +40,7 @@ mod gpu_info;
 mod geometry;
 mod debug;
 mod component_map;
+mod component_list;
 mod performance_stats;
 pub mod studio;
 
@@ -113,6 +114,7 @@ pub use {
         LiveNodeVecApi,
     },
     component_map::ComponentMap,
+    component_list::ComponentList,
     makepad_shader_compiler::{
         ShaderRegistry,
         ShaderEnum,
