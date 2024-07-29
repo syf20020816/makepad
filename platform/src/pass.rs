@@ -2,12 +2,10 @@ use crate::{
     makepad_live_compiler::{
         LiveType,
         LiveNode,
-        LiveId,
         LiveModuleId,
         LiveTypeInfo,
         LiveNodeSliceApi
     },
-    live_traits::{LiveNew, LiveApply, ApplyFrom},
     makepad_live_tokenizer::{LiveErrorOrigin, live_error_origin},
     makepad_live_id::*,
     makepad_math::*,
@@ -99,7 +97,7 @@ impl LiveNew for Pass {
 
 impl LiveApply for Pass {
     
-    fn apply(&mut self, cx: &mut Cx, from: ApplyFrom, start_index: usize, nodes: &[LiveNode]) -> usize {
+    fn apply(&mut self, cx: &mut Cx, apply: &mut Apply, start_index: usize, nodes: &[LiveNode]) -> usize {
         
         if !nodes[start_index].value.is_structy_type() {
             cx.apply_error_wrong_type_for_struct(live_error_origin!(), start_index, nodes, live_id!(View));
@@ -113,8 +111,8 @@ impl LiveApply for Pass {
                 break;
             }
             match nodes[index].id {
-                live_id!(clear_color) => cx.passes[self.pass_id()].clear_color = LiveNew::new_apply_mut_index(cx, from, &mut index, nodes),
-                live_id!(dont_clear) => cx.passes[self.pass_id()].dont_clear = LiveNew::new_apply_mut_index(cx, from, &mut index, nodes),
+                live_id!(clear_color) => cx.passes[self.pass_id()].clear_color = LiveNew::new_apply_mut_index(cx, apply, &mut index, nodes),
+                live_id!(dont_clear) => cx.passes[self.pass_id()].dont_clear = LiveNew::new_apply_mut_index(cx, apply, &mut index, nodes),
                 _ => {
                     cx.apply_error_no_matching_field(live_error_origin!(), index, nodes);
                     index = nodes.skip_node(index);
@@ -257,7 +255,7 @@ pub enum PassMatrixMode {
 #[derive(Clone)]
 pub enum CxPassRect {
     Area(Area),
-    ScaledArea(Area,f64),
+    AreaOrigin(Area, DVec2),
     Size(DVec2)
 }
 
@@ -277,6 +275,8 @@ pub struct CxPass {
     pub parent: CxPassParent,
     pub paint_dirty: bool,
     pub pass_rect: Option<CxPassRect>,
+    pub view_shift: DVec2,
+    pub view_scale: DVec2,
     pub pass_uniforms: PassUniforms,
     pub zbias_step: f32,
     pub os: CxOsPass,
@@ -298,6 +298,8 @@ impl Default for CxPass {
             clear_color: Vec4::default(),
             depth_init: 1.0,
             main_draw_list_id: None,
+            view_shift: dvec2(0.0,0.0),
+            view_scale: dvec2(1.0,1.0),
             parent: CxPassParent::None,
             paint_dirty: false,
             pass_rect: None,
@@ -325,6 +327,10 @@ impl CxPass {
     }
     
     pub fn set_matrix(&mut self, offset: DVec2, size: DVec2) {
+        
+        let offset = offset + self.view_shift;
+        let size = size * self.view_scale;
+        
         match self.matrix_mode {
             PassMatrixMode::Ortho => {
                 let ortho = Mat4::ortho(

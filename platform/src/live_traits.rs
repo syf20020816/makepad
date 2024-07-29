@@ -2,6 +2,7 @@ use {
     crate::{
         makepad_live_compiler::*,
         cx::Cx,
+        scope::Scope,
     }
 };
 
@@ -14,33 +15,36 @@ pub trait LiveRegister{
 pub trait LiveHook {
     //fn before_live_design(_cx:&mut Cx){}
         
-    fn apply_value_unknown(&mut self, cx: &mut Cx, _apply_from: ApplyFrom, index: usize, nodes: &[LiveNode]) -> usize {
+    fn apply_value_unknown(&mut self, cx: &mut Cx, _apply: &mut Apply, index: usize, nodes: &[LiveNode]) -> usize {
         if !nodes[index].origin.node_has_prefix() {
             cx.apply_error_no_matching_field(live_error_origin!(), index, nodes);
         }
         nodes.skip_node(index)
     }
 
-    fn apply_value_instance(&mut self, _cx: &mut Cx, _apply_from: ApplyFrom, index: usize, nodes: &[LiveNode]) -> usize {
+    fn apply_value_instance(&mut self, _cx: &mut Cx, _apply: &mut Apply, index: usize, nodes: &[LiveNode]) -> usize {
         nodes.skip_node(index)
     }
     
-    fn skip_apply(&mut self, _cx: &mut Cx, _apply_from: ApplyFrom, _index: usize, _nodes: &[LiveNode])->Option<usize>{None}
-    fn before_apply(&mut self, _cx: &mut Cx, _apply_from: ApplyFrom, _index: usize, _nodes: &[LiveNode]){}
-    fn after_apply(&mut self, _cx: &mut Cx, _apply_from: ApplyFrom, _index: usize, _nodes: &[LiveNode]) {}
-    fn after_apply_from(&mut self, cx: &mut Cx, apply_from: ApplyFrom) {
-        match apply_from{
-            ApplyFrom::NewFromDoc{..}=>self.after_new_from_doc(cx),
+    fn skip_apply(&mut self, _cx: &mut Cx, _apply: &mut Apply, _index: usize, _nodes: &[LiveNode])->Option<usize>{None}
+    fn before_apply(&mut self, _cx: &mut Cx, _apply: &mut Apply, _index: usize, _nodes: &[LiveNode]){}
+    fn after_apply(&mut self, _cx: &mut Cx, _apply: &mut Apply, _index: usize, _nodes: &[LiveNode]) {}
+    fn after_apply_from(&mut self, cx: &mut Cx, apply: &mut Apply) {
+        match &apply.from{
+            ApplyFrom::NewFromDoc{..}=>{self.after_new_from_doc(cx);self.after_apply_from_doc(cx);}
+            ApplyFrom::UpdateFromDoc{..}=>{self.after_update_from_doc(cx);self.after_apply_from_doc(cx);}
             _=>()
         }
     }
     fn after_new_from_doc(&mut self, _cx:&mut Cx){}
+    fn after_update_from_doc(&mut self, _cx:&mut Cx){}
+    fn after_apply_from_doc(&mut self, _cx:&mut Cx){}
     fn after_new_before_apply(&mut self, _cx: &mut Cx) {}
 }
 
 pub trait LiveHookDeref {
-    fn deref_before_apply(&mut self, _cx: &mut Cx, _apply_from: ApplyFrom, _index: usize, _nodes: &[LiveNode]){}
-    fn deref_after_apply(&mut self, _cx: &mut Cx, _apply_from: ApplyFrom, _index: usize, _nodes: &[LiveNode]){}
+    fn deref_before_apply(&mut self, _cx: &mut Cx, _apply: &mut Apply, _index: usize, _nodes: &[LiveNode]){}
+    fn deref_after_apply(&mut self, _cx: &mut Cx, _apply: &mut Apply, _index: usize, _nodes: &[LiveNode]){}
 }
 
 pub trait LiveNew: LiveApply {
@@ -50,23 +54,47 @@ pub trait LiveNew: LiveApply {
     
     fn live_type_info(cx: &mut Cx) -> LiveTypeInfo;
     
-    fn new_apply(cx: &mut Cx, from: ApplyFrom, index: usize, nodes: &[LiveNode]) -> Self where Self: Sized {
+    fn new_apply(cx: &mut Cx, apply: &mut Apply, index: usize, nodes: &[LiveNode]) -> Self where Self: Sized {
         let mut ret = Self::new(cx);
-        ret.apply(cx, from, index, nodes);
+        ret.apply(cx, apply, index, nodes);
         ret
     }
     
-    fn new_apply_mut_index(cx: &mut Cx, from: ApplyFrom, index: &mut usize, nodes: &[LiveNode]) -> Self where Self: Sized {
+    fn new_apply_over(cx: &mut Cx, nodes: &[LiveNode]) -> Self where Self: Sized {
         let mut ret = Self::new(cx);
-        *index = ret.apply(cx, from, *index, nodes);
+        ret.apply_over(cx, nodes);
+        ret
+    }
+    
+    fn new_apply_mut_index(cx: &mut Cx, apply: &mut Apply, index: &mut usize, nodes: &[LiveNode]) -> Self where Self: Sized {
+        let mut ret = Self::new(cx);
+        *index = ret.apply(cx, apply, *index, nodes);
         ret
     }
 
     fn new_from_ptr(cx: &mut Cx, live_ptr: Option<LivePtr>) -> Self where Self: Sized {
         let mut ret = Self::new(cx);
+        if let Some(live_ptr) = live_ptr{ 
+            cx.get_nodes_from_live_ptr(live_ptr, |cx, file_id, index, nodes|{
+                ret.apply(cx, &mut ApplyFrom::NewFromDoc {file_id}.into(), index, nodes)
+            });
+        }
+        return ret
+    }
+    
+    fn apply_from_ptr(&mut self, cx: &mut Cx, live_ptr: Option<LivePtr>) {
+        if let Some(live_ptr) = live_ptr{
+            cx.get_nodes_from_live_ptr(live_ptr, |cx, _file_id, index, nodes|{
+                self.apply(cx, &mut ApplyFrom::Over.into(), index, nodes)
+            });
+        }
+    }
+    
+    fn new_from_ptr_with_scope<'a> (cx: &mut Cx, scope:&'a mut Scope, live_ptr: Option<LivePtr>) -> Self where Self: Sized {
+        let mut ret = Self::new(cx);
         if let Some(live_ptr) = live_ptr{
             cx.get_nodes_from_live_ptr(live_ptr, |cx, file_id, index, nodes|{
-                ret.apply(cx, ApplyFrom::NewFromDoc {file_id}, index, nodes)
+                ret.apply(cx, &mut ApplyFrom::NewFromDoc {file_id}.with_scope(scope), index, nodes)
             });
         }
         return ret
@@ -77,18 +105,18 @@ pub trait LiveNew: LiveApply {
         {
             let live_registry_rc = cx.live_registry.clone();
             let mut live_registry = live_registry_rc.borrow_mut();
-            live_registry.main_module = Some((lti.module_id, lti.type_name));
+            live_registry.main_module = Some(lti.clone());
         }
         Self::new_from_module(cx, lti.module_id, lti.type_name).unwrap()
     }
     
     fn update_main(&mut self, cx:&mut Cx){
-        let (module_id, id) = {
+        let lti = {
             let live_registry_rc = cx.live_registry.clone();
             let live_registry = live_registry_rc.borrow_mut();
-            live_registry.main_module.unwrap()
+            live_registry.main_module.as_ref().unwrap().clone()
         };
-        self.update_from_module(cx, module_id, id);
+        self.update_from_module(cx, lti.module_id, lti.type_name);
     }
     
     fn new_local(cx: &mut Cx) -> Self where Self: Sized {
@@ -103,7 +131,7 @@ pub trait LiveNew: LiveApply {
             let file = live_registry.file_id_to_file(*file_id);
             if let Some(index) = file.expanded.nodes.child_by_name(0, id.as_instance()) {
                 let mut ret = Self::new(cx);
-                ret.apply(cx, ApplyFrom::NewFromDoc {file_id: *file_id}, index, &file.expanded.nodes);
+                ret.apply(cx, &mut ApplyFrom::NewFromDoc {file_id: *file_id}.into(), index, &file.expanded.nodes);
                 return Some(ret)
             }
         }
@@ -116,7 +144,7 @@ pub trait LiveNew: LiveApply {
         if let Some(file_id) = live_registry.module_id_to_file_id.get(&module_id) {
             let file = live_registry.file_id_to_file(*file_id);
             if let Some(index) = file.expanded.nodes.child_by_name(0, id.as_instance()) {
-                self.apply(cx, ApplyFrom::UpdateFromDoc {file_id: *file_id}, index, &file.expanded.nodes);
+                self.apply(cx, &mut ApplyFrom::UpdateFromDoc {file_id: *file_id}.into(), index, &file.expanded.nodes);
             }
         }
     }
@@ -127,14 +155,18 @@ pub trait ToLiveValue {
 }
 
 pub trait LiveApplyValue {
-    fn apply_value(&mut self, cx: &mut Cx, from: ApplyFrom, index: usize, nodes: &[LiveNode]) -> usize;
+    fn apply_value(&mut self, cx: &mut Cx, apply: &mut Apply, index: usize, nodes: &[LiveNode]) -> usize;
+}
+
+pub trait LiveApplyReset { 
+    fn apply_reset(&mut self, cx: &mut Cx, apply: &mut Apply, index: usize, nodes: &[LiveNode]);
 }
 
 pub trait LiveApply {
-    fn apply(&mut self, cx: &mut Cx, from: ApplyFrom, index: usize, nodes: &[LiveNode]) -> usize;
+    fn apply(&mut self, cx: &mut Cx, apply: &mut Apply, index: usize, nodes: &[LiveNode]) -> usize;
     
     fn apply_over(&mut self, cx: &mut Cx, nodes: &[LiveNode]) {
-        self.apply(cx, ApplyFrom::ApplyOver, 0, nodes);
+        self.apply(cx, &mut ApplyFrom::Over.into(), 0, nodes);
     }
 }
 
@@ -158,15 +190,38 @@ impl<T, const N:usize> LiveRead for [T;N]  where T: LiveRead {
     }
 } 
 
+pub struct Apply<'a,'b,'c> {
+    pub from: ApplyFrom,
+    pub scope: Option<&'c mut Scope<'a,'b>>,
+}
+
+impl ApplyFrom{
+    fn with_scope<'a, 'b, 'c>(self, scope:&'c mut Scope<'a,'b>)->Apply<'a, 'b, 'c>{
+        Apply{
+            from: self,
+            scope: Some(scope)
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub enum ApplyFrom {
     NewFromDoc {file_id: LiveFileId}, // newed from DSL
     UpdateFromDoc {file_id: LiveFileId}, // live DSL substantially updated
-    
+        
     New, // Bare new without file info
     Animate, // from animate
     AnimatorInit,
-    ApplyOver, // called from bare apply_live() call
+    Over, // called from bare apply_live() call
+}
+
+impl<'a,'b, 'c> From<ApplyFrom> for Apply<'a,'b,'c> {
+    fn from(from: ApplyFrom) -> Self {
+        Self {
+            from,
+            scope: None,
+        }
+    }
 }
 
 impl ApplyFrom {
@@ -185,25 +240,49 @@ impl ApplyFrom {
         }
     }
     
+    pub fn should_apply_reset(&self) -> bool {
+        match self {
+            Self::UpdateFromDoc{..}  => true,
+            _ => false
+        }
+    }
+    
+    pub fn is_update_from_doc(&self) -> bool {
+        match self {
+            Self::UpdateFromDoc {..} => true,
+            _ => false
+        }
+    }
+        
     pub fn file_id(&self) -> Option<LiveFileId> {
         match self {
             Self::NewFromDoc {file_id} => Some(*file_id),
-            Self::UpdateFromDoc {file_id} => Some(*file_id),
+            Self::UpdateFromDoc {file_id,..} => Some(*file_id),
             _ => None
         }
     }
+    
+    pub fn to_live_ptr(&self, cx:&Cx, index:usize) -> Option<LivePtr> {
+        if let Some(file_id) = self.file_id(){
+            let live_ptr = cx.live_registry.borrow().file_id_index_to_live_ptr(file_id, index);
+            return Some(live_ptr)
+        }
+        None
+    }
+        
+        
 }
 
 
 impl<T> LiveHook for Option<T> where T: LiveApply + LiveNew + 'static {}
 impl<T> LiveApply for Option<T> where T: LiveApply + LiveNew + 'static {
-    fn apply(&mut self, cx: &mut Cx, from: ApplyFrom, index: usize, nodes: &[LiveNode]) -> usize {
+    fn apply(&mut self, cx: &mut Cx, apply: &mut Apply, index: usize, nodes: &[LiveNode]) -> usize {
         if let Some(v) = self {
-            v.apply(cx, from, index, nodes)
+            v.apply(cx, apply, index, nodes)
         }
         else {
             let mut inner = T::new(cx);
-            let index = inner.apply(cx, from, index, nodes);
+            let index = inner.apply(cx, apply, index, nodes);
             *self = Some(inner);
             index
         }
@@ -214,9 +293,9 @@ impl<T> LiveNew for Option<T> where T: LiveApply + LiveNew + 'static{
     fn new(_cx: &mut Cx) -> Self {
         Self::None
     }
-    fn new_apply(cx: &mut Cx, from: ApplyFrom, index: usize, nodes: &[LiveNode]) -> Self {
+    fn new_apply(cx: &mut Cx, apply: &mut Apply, index: usize, nodes: &[LiveNode]) -> Self {
         let mut ret = Self::None;
-        ret.apply(cx, from, index, nodes);
+        ret.apply(cx, apply, index, nodes);
         ret
     }
     
@@ -228,7 +307,7 @@ impl<T> LiveNew for Option<T> where T: LiveApply + LiveNew + 'static{
 
 impl<T> LiveHook for Vec<T> where T: LiveApply + LiveNew + 'static {}
 impl<T> LiveApply for Vec<T> where T: LiveApply + LiveNew + 'static {
-    fn apply(&mut self, cx: &mut Cx, from: ApplyFrom, index: usize, nodes: &[LiveNode]) -> usize {
+    fn apply(&mut self, cx: &mut Cx, apply: &mut Apply, index: usize, nodes: &[LiveNode]) -> usize {
         // we can only apply from an Array
         self.clear();
         if nodes[index].is_array(){
@@ -239,7 +318,7 @@ impl<T> LiveApply for Vec<T> where T: LiveApply + LiveNew + 'static {
                     break;
                 }
                 let mut inner = T::new(cx);
-                index = inner.apply(cx, from, index, nodes);
+                index = inner.apply(cx, apply, index, nodes);
                 self.push(inner);
             }
             index
@@ -255,9 +334,9 @@ impl<T> LiveNew for Vec<T> where T: LiveApply + LiveNew + 'static{
     fn new(_cx: &mut Cx) -> Self {
         Vec::new()
     }
-    fn new_apply(cx: &mut Cx, from: ApplyFrom, index: usize, nodes: &[LiveNode]) -> Self {
+    fn new_apply(cx: &mut Cx, apply: &mut Apply, index: usize, nodes: &[LiveNode]) -> Self {
         let mut ret = Vec::new();
-        ret.apply(cx, from, index, nodes);
+        ret.apply(cx, apply, index, nodes);
         ret
     }
     
@@ -269,7 +348,7 @@ impl<T> LiveNew for Vec<T> where T: LiveApply + LiveNew + 'static{
 
 impl<T, const N:usize> LiveHook for [T;N] where T: LiveApply + LiveNew + 'static{}
 impl<T, const N:usize> LiveApply for [T;N]  where T: LiveApply + LiveNew + 'static {
-    fn apply(&mut self, cx: &mut Cx, from: ApplyFrom, index: usize, nodes: &[LiveNode]) -> usize {
+    fn apply(&mut self, cx: &mut Cx, apply: &mut Apply, index: usize, nodes: &[LiveNode]) -> usize {
         // we can only apply from an Array
         if nodes[index].is_array(){
             let mut index = index + 1;
@@ -280,7 +359,7 @@ impl<T, const N:usize> LiveApply for [T;N]  where T: LiveApply + LiveNew + 'stat
                     break;
                 }
                 if count < self.len(){
-                    index = self[count].apply(cx, from, index, nodes);
+                    index = self[count].apply(cx, apply, index, nodes);
                     count += 1;
                 }
                 else{
@@ -301,9 +380,9 @@ impl<T, const N:usize> LiveNew for [T;N] where T: LiveApply + LiveNew + 'static{
         std::array::from_fn(|_| T::new(cx))
     }
     
-    fn new_apply(cx: &mut Cx, from: ApplyFrom, index: usize, nodes: &[LiveNode]) -> Self {
+    fn new_apply(cx: &mut Cx, apply: &mut Apply, index: usize, nodes: &[LiveNode]) -> Self {
         let mut ret = Self::new(cx);
-        ret.apply(cx, from, index, nodes);
+        ret.apply(cx, apply, index, nodes);
         ret
     }
     

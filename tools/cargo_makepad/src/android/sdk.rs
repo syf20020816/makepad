@@ -1,7 +1,8 @@
+#![allow(non_snake_case)]
 
 use makepad_miniz::zip_file::*;
 use std::{
-    path::{Path},
+    path::Path,
     fs::{File, OpenOptions},
     io::{Write, Read, Seek},
 };
@@ -10,6 +11,16 @@ use crate::{
     android::*,
     makepad_shell::*,
 };
+
+pub const SDK_VERSION: &str = "33.0.1";
+pub const API_LEVEL: &str = "android-33-ext4";
+pub const BUILD_TOOLS_DIR: &str = "build-tools";
+pub const PLATFORMS_DIR: &str = "platforms";
+
+pub const _NDK_VERSION_MAJOR: &str = "25";
+pub const _NDK_VERSION_MINOR: &str = "2";
+pub const _NDK_VERSION_BUILD: &str = "9519653";
+pub const NDK_VERSION_FULL:  &str = "25.2.9519653";
 
 const URL_PLATFORM_33: &str = "https://dl.google.com/android/repository/platform-33-ext4_r01.zip";
 
@@ -62,7 +73,7 @@ pub fn download_sdk(sdk_dir: &Path, host_os: HostOs, _args: &[String]) -> Result
     
     fn curl(step: usize, src_dir: &Path, url: &str) -> Result<(), String> {
         //let https = HttpsConnection::connect("https://makepad.dev","https");
-        println!("Downloading {step}/5: {}", url);
+        println!("{step}/5: Downloading: {}", url);
         shell(src_dir, "curl", &[url, "-#", "--output", src_dir.join(url_file_name(url)).to_str().unwrap()]) ?;
         Ok(())
     }
@@ -102,13 +113,13 @@ pub fn remove_sdk_sources(sdk_dir: &Path, _host_os: HostOs, _args: &[String]) ->
     rmdir(src_dir) 
 }
 
-pub fn expand_sdk(sdk_dir: &Path, host_os: HostOs, _args: &[String], targets:&[AndroidTarget]) -> Result<(), String> {
-    
+pub fn expand_sdk(sdk_dir: &Path, host_os: HostOs, args: &[String], targets:&[AndroidTarget]) -> Result<(), String> {
+    let full_ndk = args.contains(&String::from("--full-ndk"));
     let src_dir = &sdk_dir.join("sources");
     
     fn unzip(step: usize, src_dir: &Path, sdk_dir: &Path, url: &str, files: &[(&str, bool)]) -> Result<(), String> {
         let url_file_name = url_file_name(url);
-        println!("Unzipping {step}/5: {}", url_file_name);
+        println!("{step}/5: Unzipping: {}", url_file_name);
         let mut zip_file = File::open(src_dir.join(url_file_name))
             .map_err( | _ | format!("Cant open file {url_file_name}")) ?;
         
@@ -169,7 +180,7 @@ pub fn expand_sdk(sdk_dir: &Path, host_os: HostOs, _args: &[String], targets:&[A
     
     fn untar(step: usize, src_dir: &Path, sdk_dir: &Path, url: &str, files: &[(&str, bool)]) -> Result<(), String> {
         let url_file_name = url_file_name(url);
-        println!("Untarring {step}/5: {}", url_file_name);
+        println!("{step}/5: Untarring: {}", url_file_name);
         shell(src_dir, "tar", &["-xf", src_dir.join(url_file_name).to_str().unwrap()]) ?;
         
         for (file_path, exec) in files {
@@ -179,9 +190,9 @@ pub fn expand_sdk(sdk_dir: &Path, host_os: HostOs, _args: &[String], targets:&[A
         Ok(())
     }
     
-    fn dmg_extract(step: usize, src_dir: &Path, sdk_dir: &Path, url: &str, files: &[(&str, bool)]) -> Result<(), String> {
+    fn dmg_extract(step: usize, src_dir: &Path, sdk_dir: &Path, url: &str, files: &[(&str, bool)], full_ndk: bool) -> Result<(), String> {
         let url_file_name = url_file_name(url);
-        println!("Mounting and extracting dmg {step}/5: {}", url_file_name);
+        println!("{step}/5: Mounting and extracting {} dmg: {}", if full_ndk { "full" } else { "partial" }, url_file_name);
         
         let mount_point = &src_dir.join(&format!("mount_{url_file_name}"));
         mkdir(mount_point) ?;
@@ -190,26 +201,34 @@ pub fn expand_sdk(sdk_dir: &Path, host_os: HostOs, _args: &[String], targets:&[A
         
         for (file_path, exec) in files {
             let (source_path, dest_path) = if let Some((a, b)) = file_path.split_once('|') {(a, b)}else {(*file_path, *file_path)};
-            cp(&mount_point.join(source_path), &sdk_dir.join(dest_path), *exec) ?;
+            let copy_fn = if full_ndk { shell::cp_all } else { shell::cp };
+            copy_fn(&mount_point.join(source_path), &sdk_dir.join(dest_path), *exec) ?;
         }
         shell(sdk_dir, "umount", &[mount_point.to_str().unwrap()]) ?;
         Ok(())
     }
     
     fn copy_map(base_in: &str, base_out: &str, file: &str) -> String {
-        format!("{base_in}/{file}|{base_out}/{file}")
+        // allow an empty path to be properly passed in for either base.
+        fn separator(base: &str) -> &str {
+            if base.is_empty() { "" } else { "/" }
+        }
+        
+        let sep_in = separator(base_in);
+        let sep_out = separator(base_out);
+        format!("{base_in}{sep_in}{file}|{base_out}{sep_out}{file}")
     }
     
     match host_os {
         HostOs::WindowsX64 => {
             unzip(1, src_dir, sdk_dir, URL_PLATFORM_33, &[
-                ("android-33-ext4/android.jar", false),
+                (&copy_map("", PLATFORMS_DIR, &format!("{API_LEVEL}/android.jar")), false),
             ]) ?;
             unzip(2, src_dir, sdk_dir, URL_BUILD_TOOLS_33_WINDOWS, &[
-                ("android-13/aapt.exe", false),
-                ("android-13/zipalign.exe", false),
-                ("android-13/lib/apksigner.jar", false),
-                ("android-13/lib/d8.jar", false),
+                (&copy_map("android-13", &format!("{BUILD_TOOLS_DIR}/{SDK_VERSION}"), "aapt.exe"), false),
+                (&copy_map("android-13", &format!("{BUILD_TOOLS_DIR}/{SDK_VERSION}"), "zipalign.exe"), false),
+                (&copy_map("android-13", &format!("{BUILD_TOOLS_DIR}/{SDK_VERSION}"), "lib/apksigner.jar"), false),
+                (&copy_map("android-13", &format!("{BUILD_TOOLS_DIR}/{SDK_VERSION}"), "lib/d8.jar"), false),
             ]) ?;
             unzip(3, src_dir, sdk_dir, URL_PLATFORM_TOOLS_33_WINDOWS, &[
                 ("platform-tools/adb.exe", false),
@@ -217,48 +236,102 @@ pub fn expand_sdk(sdk_dir: &Path, host_os: HostOs, _args: &[String], targets:&[A
                 ("platform-tools/AdbWinUsbApi.dll", false),
             ]) ?;
             const NDK_IN: &str = "android-ndk-r25c/toolchains/llvm/prebuilt/windows-x86_64";
-            const NDK_OUT: &str = "NDK/toolchains/llvm/prebuilt/windows-x86_64";
+            let NDK_OUT = &format!("ndk/{NDK_VERSION_FULL}/toolchains/llvm/prebuilt/windows-x86_64");
             
-            let mut ndk_extract = Vec::new();
-            #[allow(non_snake_case)]
-            for target in targets{
-                let sys_dir = target.sys_dir();
-                let clang = target.clang();
-                let unwind_dir = target.unwind_dir();
-                let SYS_IN = &format!("android-ndk-r25c/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/lib/{sys_dir}/33");
-                let SYS_OUT = &format!("NDK/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/lib/{sys_dir}/33");
-                let UNWIND_IN = &format!("android-ndk-r25c/toolchains/llvm/prebuilt/windows-x86_64/lib64/clang/14.0.7/lib/linux/{unwind_dir}"); 
-                
-                ndk_extract.extend_from_slice(&[
-                    (copy_map(NDK_IN, NDK_OUT, &format!("bin/{clang}33-clang")), false),
-                    (copy_map(NDK_IN, NDK_OUT, &format!("bin/{clang}33-clang.cmd")), false),
-                    (copy_map(NDK_IN, NDK_OUT, "bin/libwinpthread-1.dll"), false),
-                    (copy_map(NDK_IN, NDK_OUT, "bin/libxml2.dll"), false),
-                    (copy_map(NDK_IN, NDK_OUT, "bin/clang.exe"), false),
-                    (copy_map(NDK_IN, NDK_OUT, "bin/ld.exe"), false),
-                    (copy_map(SYS_IN, SYS_OUT, "crtbegin_so.o"), false),
-                    (copy_map(SYS_IN, SYS_OUT, "crtend_so.o"), false),
-                    (copy_map(SYS_IN, SYS_OUT, "libc.so"), false),
-                    (copy_map(SYS_IN, SYS_OUT, "libGLESv2.so"), false),
-                    (copy_map(SYS_IN, SYS_OUT, "libm.so"), false),
-                    (copy_map(SYS_IN, SYS_OUT, "liblog.so"), false),
-                    (copy_map(SYS_IN, SYS_OUT, "libEGL.so"), false),
-                    (copy_map(SYS_IN, SYS_OUT, "libdl.so"), false),
-                    (copy_map(SYS_IN, SYS_OUT, "libaaudio.so"), false),
-                    (copy_map(SYS_IN, SYS_OUT, "libandroid.so"), false),
-                    (copy_map(SYS_IN, SYS_OUT, "libamidi.so"), false),
-                    (copy_map(SYS_IN, SYS_OUT, "libcamera2ndk.so"), false),
-                    (copy_map(SYS_IN, SYS_OUT, "libnativewindow.so"), false),
-                    (copy_map(SYS_IN, SYS_OUT, "libmediandk.so"), false),
-                    (format!("{SYS_IN}/libc.so|{SYS_OUT}/libgcc.so"), false),
-                    (format!("{UNWIND_IN}/libunwind.a|{SYS_OUT}/libunwind.a"), false),
-                ]);
+            if full_ndk {
+                // We only need to extract the contents of the `NDK_IN` directory within the `URL_NDK_33_LINUX` zip file,
+                // and then copy that directory it into the proper `NDK_OUT` directory location.
+                let cwd = std::env::current_dir().unwrap();
+                let url_file_name = url_file_name(URL_NDK_33_WINDOWS);
+                println!("4/5: Unzipping: {} (full NDK)", url_file_name);
+                let ndk_out_path = sdk_dir.join(NDK_OUT);
+                mkdir(&ndk_out_path)?;
+
+                // Some shell environments on Windows are Linux-like (Git Bash, cygwin, mingw, etc),
+                // and therefore support `unzip` and `cp`.
+                let unzip_result = shell(
+                    &cwd,
+                    "unzip",
+                    &[
+                        "-q", // quiet
+                        "-o", // overwrite existing files
+                        src_dir.join(url_file_name).to_str().unwrap(),
+                        &format!("{NDK_IN}/**/*"),
+                        "-d", src_dir.to_str().unwrap(),
+                    ]
+                );
+                if unzip_result.is_ok() {
+                    shell(
+                        &cwd,
+                        "cp",
+                        &[
+                            "--force",
+                            "--recursive",
+                            "--preserve",
+                            src_dir.join(NDK_IN).to_str().unwrap(),
+                            ndk_out_path.parent().unwrap().to_str().unwrap(),
+                        ]
+                    ).unwrap();
+                } else {
+                    // If `unzip` failed, we're running on a true Windows shell (cmd, powershell),
+                    // so we instead use `tar` (which is the BSD version of tar) to extract the zip file.
+                    // Bonus: the BSD tar utility supports extracting files directly into NDK_OUT.
+                    let num_path_components = Path::new(NDK_IN).iter().count();
+                    shell(
+                        &cwd,
+                        "tar",
+                        &[
+                            "-x",
+                            "-z",
+                            "-f", src_dir.join(url_file_name).to_str().unwrap(),
+                            "--strip-components", &num_path_components.to_string(),
+                            "-C", ndk_out_path.to_str().unwrap(),
+                            NDK_IN,
+                        ]
+                    ).unwrap();
+                }
+            } else {
+                let mut ndk_extract = Vec::new();
+                for target in targets{
+                    let sys_dir = target.sys_dir();
+                    let clang = target.clang();
+                    let unwind_dir = target.unwind_dir();
+                    let SYS_IN = &format!("android-ndk-r25c/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/lib/{sys_dir}/33");
+                    let SYS_OUT = &format!("ndk/{NDK_VERSION_FULL}/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/lib/{sys_dir}/33");
+                    let UNWIND_IN = &format!("android-ndk-r25c/toolchains/llvm/prebuilt/windows-x86_64/lib64/clang/14.0.7/lib/linux/{unwind_dir}");
+
+                    ndk_extract.extend_from_slice(&[
+                        (copy_map(NDK_IN, NDK_OUT, &format!("bin/{clang}33-clang")), false),
+                        (copy_map(NDK_IN, NDK_OUT, &format!("bin/{clang}33-clang.cmd")), false),
+                        (copy_map(NDK_IN, NDK_OUT, "bin/libwinpthread-1.dll"), false),
+                        (copy_map(NDK_IN, NDK_OUT, "bin/libxml2.dll"), false),
+                        (copy_map(NDK_IN, NDK_OUT, "bin/clang.exe"), false),
+                        (copy_map(NDK_IN, NDK_OUT, "bin/ld.exe"), false),
+                        (copy_map(SYS_IN, SYS_OUT, "crtbegin_so.o"), false),
+                        (copy_map(SYS_IN, SYS_OUT, "crtend_so.o"), false),
+                        (copy_map(SYS_IN, SYS_OUT, "libc.so"), false),
+                        (copy_map(SYS_IN, SYS_OUT, "libGLESv2.so"), false),
+                        (copy_map(SYS_IN, SYS_OUT, "libm.so"), false),
+                        (copy_map(SYS_IN, SYS_OUT, "liblog.so"), false),
+                        (copy_map(SYS_IN, SYS_OUT, "libEGL.so"), false),
+                        (copy_map(SYS_IN, SYS_OUT, "libdl.so"), false),
+                        (copy_map(SYS_IN, SYS_OUT, "libaaudio.so"), false),
+                        (copy_map(SYS_IN, SYS_OUT, "libandroid.so"), false),
+                        (copy_map(SYS_IN, SYS_OUT, "libamidi.so"), false),
+                        (copy_map(SYS_IN, SYS_OUT, "libcamera2ndk.so"), false),
+                        (copy_map(SYS_IN, SYS_OUT, "libnativewindow.so"), false),
+                        (copy_map(SYS_IN, SYS_OUT, "libmediandk.so"), false),
+                        (format!("{SYS_IN}/libc.so|{SYS_OUT}/libgcc.so"), false),
+                        (format!("{UNWIND_IN}/libunwind.a|{SYS_OUT}/libunwind.a"), false),
+                    ]);
+                }
+                let ndk_extract: Vec<(&str,bool)> = ndk_extract.iter().map(|s| (s.0.as_str(),s.1)).collect();
+                unzip(4, src_dir, sdk_dir, URL_NDK_33_WINDOWS, &ndk_extract) ?;
             }
-            let ndk_extract: Vec<(&str,bool)> = ndk_extract.iter().map(|s| (s.0.as_str(),s.1)).collect();
-            unzip(4, src_dir, sdk_dir, URL_NDK_33_WINDOWS, &ndk_extract) ?;
+
             // patch the .cmd file to stop complaining
             {
-                let cmd_file_path = sdk_dir.join("NDK/toolchains/llvm/prebuilt/windows-x86_64/bin/aarch64-linux-android33-clang.cmd");
+                let cmd_file_path = sdk_dir.join(format!("ndk/{NDK_VERSION_FULL}/toolchains/llvm/prebuilt/windows-x86_64/bin/aarch64-linux-android33-clang.cmd"));
 
                 // Open the file for reading
                 let mut ndk_cmd = OpenOptions::new()
@@ -312,56 +385,78 @@ pub fn expand_sdk(sdk_dir: &Path, host_os: HostOs, _args: &[String], targets:&[A
         }
         HostOs::MacosX64 | HostOs::MacosAarch64 => {
             unzip(1, src_dir, sdk_dir, URL_PLATFORM_33, &[
-                ("android-33-ext4/android.jar", false),
+                (&copy_map("", PLATFORMS_DIR, &format!("{API_LEVEL}/android.jar")), false),
             ]) ?;
             unzip(2, src_dir, sdk_dir, URL_BUILD_TOOLS_33_MACOS, &[
-                ("android-13/aapt", true),
-                ("android-13/zipalign", true),
-                ("android-13/lib/apksigner.jar", false),
-                ("android-13/lib/d8.jar", false),
+                (&copy_map("android-13", &format!("{BUILD_TOOLS_DIR}/{SDK_VERSION}"), "aapt"), true),
+                (&copy_map("android-13", &format!("{BUILD_TOOLS_DIR}/{SDK_VERSION}"), "zipalign"), true),
+                (&copy_map("android-13", &format!("{BUILD_TOOLS_DIR}/{SDK_VERSION}"), "lib/apksigner.jar"), false),
+                (&copy_map("android-13", &format!("{BUILD_TOOLS_DIR}/{SDK_VERSION}"), "lib/d8.jar"), false),
             ]) ?;
             unzip(3, src_dir, sdk_dir, URL_PLATFORM_TOOLS_33_MACOS, &[
                 ("platform-tools/adb", true),
             ]) ?;
             const NDK_IN: &str = "AndroidNDK9519653.app/Contents/NDK/toolchains/llvm/prebuilt/darwin-x86_64";
-            const NDK_OUT: &str = "NDK/toolchains/llvm/prebuilt/darwin-x86_64";
+            let NDK_OUT = &format!("ndk/{NDK_VERSION_FULL}/toolchains/llvm/prebuilt/darwin-x86_64");
             
-            let mut ndk_extract = Vec::new();
-            #[allow(non_snake_case)]
-            for target in targets{
-                let sys_dir = target.sys_dir();
-                let clang = target.clang();
-                let unwind_dir = target.unwind_dir();
-                let SYS_IN = &format!("AndroidNDK9519653.app/Contents/NDK/toolchains/llvm/prebuilt/darwin-x86_64/sysroot/usr/lib/{sys_dir}/33");
-                let SYS_OUT = &format!("NDK/toolchains/llvm/prebuilt/darwin-x86_64/sysroot/usr/lib/{sys_dir}/33");
-                let UNWIND_IN = &format!("AndroidNDK9519653.app/Contents/NDK/toolchains/llvm/prebuilt/darwin-x86_64/lib64/clang/14.0.7/lib/linux/{unwind_dir}"); 
-                ndk_extract.extend_from_slice(&[
-                    (copy_map(NDK_IN, NDK_OUT, &format!("bin/{clang}33-clang")), true),
-                    (copy_map(NDK_IN, NDK_OUT, "bin/clang"), true),
-                    (copy_map(NDK_IN, NDK_OUT, "bin/ld"), true),
-                    (copy_map(NDK_IN, NDK_OUT, "lib64/libxml2.2.9.13.dylib"), false),
-                    (copy_map(NDK_IN, NDK_OUT, "lib64/libxml2.dylib"), false),
-                    (copy_map(NDK_IN, NDK_OUT, "lib64/libxml2.2.9.13.dylib"), false),
-                    (copy_map(SYS_IN, SYS_OUT, "crtbegin_so.o"), false),
-                    (copy_map(SYS_IN, SYS_OUT, "crtend_so.o"), false),
-                    (copy_map(SYS_IN, SYS_OUT, "libc.so"), false),
-                    (copy_map(SYS_IN, SYS_OUT, "libGLESv2.so"), false),
-                    (copy_map(SYS_IN, SYS_OUT, "libm.so"), false),
-                    (copy_map(SYS_IN, SYS_OUT, "liblog.so"), false),
-                    (copy_map(SYS_IN, SYS_OUT, "libEGL.so"), false),
-                    (copy_map(SYS_IN, SYS_OUT, "libdl.so"), false),
-                    (copy_map(SYS_IN, SYS_OUT, "libaaudio.so"), false),
-                    (copy_map(SYS_IN, SYS_OUT, "libandroid.so"), false),
-                    (copy_map(SYS_IN, SYS_OUT, "libamidi.so"), false),
-                    (copy_map(SYS_IN, SYS_OUT, "libcamera2ndk.so"), false),
-                    (copy_map(SYS_IN, SYS_OUT, "libnativewindow.so"), false),
-                    (copy_map(SYS_IN, SYS_OUT, "libmediandk.so"), false),
-                    (format!("{SYS_IN}/libc.so|{SYS_OUT}/libgcc.so"), false),
-                    (format!("{UNWIND_IN}/libunwind.a|{SYS_OUT}/libunwind.a"), false),
-                ]);
+            if full_ndk {
+                let toolchain_dir = copy_map(NDK_IN, NDK_OUT, "");
+                let files = [ (toolchain_dir.as_str(), false) ];
+                dmg_extract(4, src_dir, sdk_dir, URL_NDK_33_MACOS, &files, full_ndk) ?;
+                // We copied over the entire contents of `toolchains/llvm/prebuilt/darwin-x86_64`,
+                // but we still need to make the files in `bin` actually executable.
+                #[cfg(any(target_os = "macos", target_os = "linux"))] {
+                    use std::os::unix::fs::PermissionsExt;
+                    let bin_dir = sdk_dir.join(NDK_OUT).join("bin");
+                    std::fs::read_dir(bin_dir)
+                        .expect("failed to read NDK `bin/` dir: {bin_dir:?}")
+                        .filter_map(|r| r.ok().and_then(|entry| {
+                            let path = entry.path();
+                            path.is_file().then_some(path)
+                        }))
+                        .for_each(|bin_file|
+                            std::fs::set_permissions(&bin_file, PermissionsExt::from_mode(0o744))
+                                .expect("failed to set exec permissions on {bin_file:?}")
+                        );
+                }
+            } else {
+                let mut ndk_extract = Vec::new();
+                #[allow(non_snake_case)]
+                for target in targets{
+                    let sys_dir = target.sys_dir();
+                    let clang = target.clang();
+                    let unwind_dir = target.unwind_dir();
+                    let SYS_IN = &format!("AndroidNDK9519653.app/Contents/NDK/toolchains/llvm/prebuilt/darwin-x86_64/sysroot/usr/lib/{sys_dir}/33");
+                    let SYS_OUT = &format!("ndk/{NDK_VERSION_FULL}/toolchains/llvm/prebuilt/darwin-x86_64/sysroot/usr/lib/{sys_dir}/33");
+                    let UNWIND_IN = &format!("AndroidNDK9519653.app/Contents/NDK/toolchains/llvm/prebuilt/darwin-x86_64/lib64/clang/14.0.7/lib/linux/{unwind_dir}"); 
+                    ndk_extract.extend_from_slice(&[
+                        (copy_map(NDK_IN, NDK_OUT, &format!("bin/{clang}33-clang")), true),
+                        (copy_map(NDK_IN, NDK_OUT, "bin/clang"), true),
+                        (copy_map(NDK_IN, NDK_OUT, "bin/ld"), true),
+                        (copy_map(NDK_IN, NDK_OUT, "lib64/libxml2.2.9.13.dylib"), false),
+                        (copy_map(NDK_IN, NDK_OUT, "lib64/libxml2.dylib"), false),
+                        (copy_map(NDK_IN, NDK_OUT, "lib64/libxml2.2.9.13.dylib"), false),
+                        (copy_map(SYS_IN, SYS_OUT, "crtbegin_so.o"), false),
+                        (copy_map(SYS_IN, SYS_OUT, "crtend_so.o"), false),
+                        (copy_map(SYS_IN, SYS_OUT, "libc.so"), false),
+                        (copy_map(SYS_IN, SYS_OUT, "libGLESv2.so"), false),
+                        (copy_map(SYS_IN, SYS_OUT, "libm.so"), false),
+                        (copy_map(SYS_IN, SYS_OUT, "liblog.so"), false),
+                        (copy_map(SYS_IN, SYS_OUT, "libEGL.so"), false),
+                        (copy_map(SYS_IN, SYS_OUT, "libdl.so"), false),
+                        (copy_map(SYS_IN, SYS_OUT, "libaaudio.so"), false),
+                        (copy_map(SYS_IN, SYS_OUT, "libandroid.so"), false),
+                        (copy_map(SYS_IN, SYS_OUT, "libamidi.so"), false),
+                        (copy_map(SYS_IN, SYS_OUT, "libcamera2ndk.so"), false),
+                        (copy_map(SYS_IN, SYS_OUT, "libnativewindow.so"), false),
+                        (copy_map(SYS_IN, SYS_OUT, "libmediandk.so"), false),
+                        (format!("{SYS_IN}/libc.so|{SYS_OUT}/libgcc.so"), false),
+                        (format!("{UNWIND_IN}/libunwind.a|{SYS_OUT}/libunwind.a"), false),
+                    ]);
+                }
+                let ndk_extract: Vec<(&str,bool)> = ndk_extract.iter().map(|s| (s.0.as_str(),s.1)).collect();
+                dmg_extract(4, src_dir, sdk_dir, URL_NDK_33_MACOS, &ndk_extract, full_ndk) ?;
             }
-            let ndk_extract: Vec<(&str,bool)> = ndk_extract.iter().map(|s| (s.0.as_str(),s.1)).collect();
-            dmg_extract(4, src_dir, sdk_dir, URL_NDK_33_MACOS, &ndk_extract) ?;
             
             const JDK_IN: &str = "jdk-17.0.2.jdk/Contents/Home";
             const JDK_OUT: &str = "openjdk";
@@ -392,61 +487,94 @@ pub fn expand_sdk(sdk_dir: &Path, host_os: HostOs, _args: &[String], targets:&[A
         }
         HostOs::LinuxX64 => {
             unzip(1, src_dir, sdk_dir, URL_PLATFORM_33, &[
-                ("android-33-ext4/android.jar", false),
+                (&copy_map("", PLATFORMS_DIR, &format!("{API_LEVEL}/android.jar")), false),
             ]) ?;
             unzip(2, src_dir, sdk_dir, URL_BUILD_TOOLS_33_LINUX, &[
-                ("android-13/aapt", true),
-                ("android-13/lib64/libc++.so", true),
-                ("android-13/zipalign", true),
-                ("android-13/lib/apksigner.jar", false),
-                ("android-13/lib/d8.jar", false),
+                (&copy_map("android-13", &format!("{BUILD_TOOLS_DIR}/{SDK_VERSION}"), "aapt"), true),
+                (&copy_map("android-13", &format!("{BUILD_TOOLS_DIR}/{SDK_VERSION}"), "lib64/libc++.so"), true),
+                (&copy_map("android-13", &format!("{BUILD_TOOLS_DIR}/{SDK_VERSION}"), "zipalign"), true),
+                (&copy_map("android-13", &format!("{BUILD_TOOLS_DIR}/{SDK_VERSION}"), "lib/apksigner.jar"), false),
+                (&copy_map("android-13", &format!("{BUILD_TOOLS_DIR}/{SDK_VERSION}"), "lib/d8.jar"), false),
             ]) ?;
             unzip(3, src_dir, sdk_dir, URL_PLATFORM_TOOLS_33_LINUX, &[
                 ("platform-tools/adb", true),
             ]) ?;
             const NDK_IN: &str = "android-ndk-r25c/toolchains/llvm/prebuilt/linux-x86_64";
-            const NDK_OUT: &str = "NDK/toolchains/llvm/prebuilt/linux-x86_64";
+            let NDK_OUT = &format!("ndk/{NDK_VERSION_FULL}/toolchains/llvm/prebuilt/linux-x86_64");
             
-            let mut ndk_extract = Vec::new();
-            #[allow(non_snake_case)]
-            for target in targets{
-                let sys_dir = target.sys_dir();
-                let clang = target.clang();
-                let unwind_dir = target.unwind_dir();
-                let SYS_IN = &format!("android-ndk-r25c/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/{sys_dir}/33");
-                let SYS_OUT = &format!("NDK/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/{sys_dir}/33");
-                let UNWIND_IN = &format!("android-ndk-r25c/toolchains/llvm/prebuilt/linux-x86_64/lib64/clang/14.0.7/lib/linux/{unwind_dir}"); 
-                ndk_extract.extend_from_slice(&[
-                    (copy_map(NDK_IN, NDK_OUT, &format!("bin/{clang}33-clang")), true),
-                    (copy_map(NDK_IN, NDK_OUT, "bin/clang"), true),
-                    (copy_map(NDK_IN, NDK_OUT, "bin/clang-14"), true),
-                    (copy_map(NDK_IN, NDK_OUT, "bin/ld"), true),
-                    (copy_map(NDK_IN, NDK_OUT, "bin/ld.lld"), true),
-                    (copy_map(NDK_IN, NDK_OUT, "bin/lld"), true),
-                    (copy_map(NDK_IN, NDK_OUT, "lib64/libxml2.so.2.9.13"), false),
-                    (copy_map(NDK_IN, NDK_OUT, "lib64/libxml2.so"), false),
-                    (copy_map(NDK_IN, NDK_OUT, "lib64/libc++.so"), false),
-                    (copy_map(NDK_IN, NDK_OUT, "lib64/libc++.so.1"), false),
-                    (copy_map(SYS_IN, SYS_OUT, "crtbegin_so.o"), false),
-                    (copy_map(SYS_IN, SYS_OUT, "crtend_so.o"), false),
-                    (copy_map(SYS_IN, SYS_OUT, "libc.so"), false),
-                    (copy_map(SYS_IN, SYS_OUT, "libGLESv2.so"), false),
-                    (copy_map(SYS_IN, SYS_OUT, "libm.so"), false),
-                    (copy_map(SYS_IN, SYS_OUT, "liblog.so"), false),
-                    (copy_map(SYS_IN, SYS_OUT, "libEGL.so"), false),
-                    (copy_map(SYS_IN, SYS_OUT, "libdl.so"), false),
-                    (copy_map(SYS_IN, SYS_OUT, "libaaudio.so"), false),
-                    (copy_map(SYS_IN, SYS_OUT, "libandroid.so"), false),                    
-                    (copy_map(SYS_IN, SYS_OUT, "libamidi.so"), false),
-                    (copy_map(SYS_IN, SYS_OUT, "libcamera2ndk.so"), false),
-                    (copy_map(SYS_IN, SYS_OUT, "libnativewindow.so"), false),
-                    (copy_map(SYS_IN, SYS_OUT, "libmediandk.so"), false),
-                    (format!("{SYS_IN}/libc.so|{SYS_OUT}/libgcc.so"), false),
-                    (format!("{UNWIND_IN}/libunwind.a|{SYS_OUT}/libunwind.a"), false),
-                ]);
+            if full_ndk {
+                // We only need to extract the contents of the `NDK_IN` directory within the `URL_NDK_33_LINUX` zip file,
+                // and then copy that directory it into the proper `NDK_OUT` directory location.
+                let cwd = std::env::current_dir().unwrap();
+                let url_file_name = url_file_name(URL_NDK_33_LINUX);
+                println!("4/5: Unzipping: {} (full NDK)", url_file_name);
+                let ndk_out_path = sdk_dir.join(NDK_OUT);
+                mkdir(&ndk_out_path)?;
+                shell(
+                    &cwd,
+                    "unzip",
+                    &[
+                        "-q", // quiet
+                        "-o", // overwrite existing files
+                        src_dir.join(url_file_name).to_str().unwrap(),
+                        &format!("{NDK_IN}/*"),
+                        "-d", src_dir.to_str().unwrap(),
+                    ]
+                ).unwrap();
+                shell(
+                    &cwd,
+                    "cp",
+                    &[
+                        "--force",
+                        "--recursive",
+                        "--preserve",
+                        src_dir.join(NDK_IN).to_str().unwrap(),
+                        ndk_out_path.parent().unwrap().to_str().unwrap(),
+                    ]
+                ).unwrap();
+            } else {
+                // Extract only the bare minimum NDK to build makepad and an app's Rust-only contents.
+                let mut ndk_extract = Vec::new();
+                #[allow(non_snake_case)]
+                for target in targets{
+                    let sys_dir = target.sys_dir();
+                    let clang = target.clang();
+                    let unwind_dir = target.unwind_dir();
+                    let SYS_IN = &format!("android-ndk-r25c/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/{sys_dir}/33");
+                    let SYS_OUT = &format!("ndk/{NDK_VERSION_FULL}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/{sys_dir}/33");
+                    let UNWIND_IN = &format!("android-ndk-r25c/toolchains/llvm/prebuilt/linux-x86_64/lib64/clang/14.0.7/lib/linux/{unwind_dir}"); 
+                    ndk_extract.extend_from_slice(&[
+                        (copy_map(NDK_IN, NDK_OUT, &format!("bin/{clang}33-clang")), true),
+                        (copy_map(NDK_IN, NDK_OUT, "bin/clang"), true),
+                        (copy_map(NDK_IN, NDK_OUT, "bin/clang-14"), true),
+                        (copy_map(NDK_IN, NDK_OUT, "bin/ld"), true),
+                        (copy_map(NDK_IN, NDK_OUT, "bin/ld.lld"), true),
+                        (copy_map(NDK_IN, NDK_OUT, "bin/lld"), true),
+                        (copy_map(NDK_IN, NDK_OUT, "lib64/libxml2.so.2.9.13"), false),
+                        (copy_map(NDK_IN, NDK_OUT, "lib64/libxml2.so"), false),
+                        (copy_map(NDK_IN, NDK_OUT, "lib64/libc++.so"), false),
+                        (copy_map(NDK_IN, NDK_OUT, "lib64/libc++.so.1"), false),
+                        (copy_map(SYS_IN, SYS_OUT, "crtbegin_so.o"), false),
+                        (copy_map(SYS_IN, SYS_OUT, "crtend_so.o"), false),
+                        (copy_map(SYS_IN, SYS_OUT, "libc.so"), false),
+                        (copy_map(SYS_IN, SYS_OUT, "libGLESv2.so"), false),
+                        (copy_map(SYS_IN, SYS_OUT, "libm.so"), false),
+                        (copy_map(SYS_IN, SYS_OUT, "liblog.so"), false),
+                        (copy_map(SYS_IN, SYS_OUT, "libEGL.so"), false),
+                        (copy_map(SYS_IN, SYS_OUT, "libdl.so"), false),
+                        (copy_map(SYS_IN, SYS_OUT, "libaaudio.so"), false),
+                        (copy_map(SYS_IN, SYS_OUT, "libandroid.so"), false),                    
+                        (copy_map(SYS_IN, SYS_OUT, "libamidi.so"), false),
+                        (copy_map(SYS_IN, SYS_OUT, "libcamera2ndk.so"), false),
+                        (copy_map(SYS_IN, SYS_OUT, "libnativewindow.so"), false),
+                        (copy_map(SYS_IN, SYS_OUT, "libmediandk.so"), false),
+                        (format!("{SYS_IN}/libc.so|{SYS_OUT}/libgcc.so"), false),
+                        (format!("{UNWIND_IN}/libunwind.a|{SYS_OUT}/libunwind.a"), false),
+                    ]);
+                }
+                let ndk_extract: Vec<(&str,bool)> = ndk_extract.iter().map(|s| (s.0.as_str(),s.1)).collect();
+                unzip(4, src_dir, sdk_dir, URL_NDK_33_LINUX, &ndk_extract) ?;
             }
-            let ndk_extract: Vec<(&str,bool)> = ndk_extract.iter().map(|s| (s.0.as_str(),s.1)).collect();
-            unzip(4, src_dir, sdk_dir, URL_NDK_33_LINUX, &ndk_extract) ?;
             
             const JDK_IN: &str = "jdk-17.0.2";
             const JDK_OUT: &str = "openjdk";

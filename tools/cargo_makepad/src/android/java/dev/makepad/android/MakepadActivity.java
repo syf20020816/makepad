@@ -9,6 +9,10 @@ import android.view.ViewGroup;
 import android.view.inputmethod.InputMethodManager;
 import android.content.Context;
 
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.pm.ApplicationInfo;
+
 import java.util.HashMap;
 import java.util.ArrayList;
 import java.io.OutputStream;
@@ -129,7 +133,7 @@ class MakepadSurface
     @Override
     public boolean onTouch(View view, MotionEvent event) {
         MakepadNative.surfaceOnTouch(event);
-        return true;    
+        return true;
     }
 
      @Override
@@ -163,7 +167,7 @@ class MakepadSurface
             int metaState = event.getMetaState();
             MakepadNative.surfaceOnKeyUp(keyCode, metaState);
         }
-        
+
         if (event.getAction() == KeyEvent.ACTION_UP || event.getAction() == KeyEvent.ACTION_MULTIPLE) {
             int character = event.getUnicodeChar();
             if (character == 0) {
@@ -177,6 +181,10 @@ class MakepadSurface
                 MakepadNative.surfaceOnCharacter(character);
             }
         }
+
+        // if ((keyCode == KeyEvent.KEYCODE_BACK)) {
+        //     Log.d("Makepad", "KEYCODE_BACK");
+        // }
 
         if ((keyCode == KeyEvent.KEYCODE_VOLUME_UP) || (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN)) {
             return super.onKeyUp(keyCode, event);
@@ -224,7 +232,7 @@ class ResizingLayout
     }
 }
 
-public class MakepadActivity extends Activity implements 
+public class MakepadActivity extends Activity implements
 MidiManager.OnDeviceOpenedListener{
     //% MAIN_ACTIVITY_BODY
 
@@ -269,13 +277,20 @@ MidiManager.OnDeviceOpenedListener{
 
         String cache_path = this.getCacheDir().getAbsolutePath();
         float density = getResources().getDisplayMetrics().density;
+        boolean isEmulator = this.isEmulator();
 
-        MakepadNative.onAndroidParams(cache_path, density);
+        MakepadNative.onAndroidParams(cache_path, density, isEmulator);
 
         // Set volume keys to control music stream, we might want make this flexible for app devs
         setVolumeControlStream(AudioManager.STREAM_MUSIC);
 
         //% MAIN_ACTIVITY_ON_CREATE
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        MakepadNative.activityOnStart();
     }
 
     @Override
@@ -285,15 +300,12 @@ MidiManager.OnDeviceOpenedListener{
 
         //% MAIN_ACTIVITY_ON_RESUME
     }
-
     @Override
-    @SuppressWarnings("deprecation")
-    public void onBackPressed() {
-        Log.w("SAPP", "onBackPressed");
+    protected void onPause() {
+        super.onPause();
+        MakepadNative.activityOnPause();
 
-        // TODO: here is the place to handle request_quit/order_quit/cancel_quit
-
-        super.onBackPressed();
+        //% MAIN_ACTIVITY_ON_PAUSE
     }
 
     @Override
@@ -305,16 +317,22 @@ MidiManager.OnDeviceOpenedListener{
     @Override
     protected void onDestroy() {
         super.onDestroy();
-
         MakepadNative.activityOnDestroy();
     }
 
     @Override
-    protected void onPause() {
-        super.onPause();
-        MakepadNative.activityOnPause();
+    @SuppressWarnings("deprecation")
+    public void onBackPressed() {
+        Log.w("SAPP", "onBackPressed");
+        super.onBackPressed();
+        // TODO: here is the place to handle request_quit/order_quit/cancel_quit
+        MakepadNative.onBackPressed();
+    }
 
-        //% MAIN_ACTIVITY_ON_PAUSE
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        MakepadNative.activityOnWindowFocusChanged(hasFocus);
     }
 
     @Override
@@ -360,10 +378,24 @@ MidiManager.OnDeviceOpenedListener{
                     imm.showSoftInput(view, 0);
                 } else {
                     InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-                    imm.hideSoftInputFromWindow(view.getWindowToken(),0); 
+                    imm.hideSoftInputFromWindow(view.getWindowToken(),0);
                 }
             }
         });
+    }
+
+    public void copyToClipboard(String content) {
+        ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+        // User-facing description of the clipboard content
+        String clipLabel = getApplicationName() + " clip";
+        ClipData clip = ClipData.newPlainText(clipLabel, content);
+        clipboard.setPrimaryClip(clip);
+    }
+
+    private String getApplicationName() {
+        ApplicationInfo applicationInfo = getApplicationContext().getApplicationInfo();
+        CharSequence appName = applicationInfo.loadLabel(getPackageManager());
+        return appName.toString();
     }
 
     public void requestHttp(long id, long metadataId, String url, String method, String headers, byte[] body) {
@@ -387,7 +419,7 @@ MidiManager.OnDeviceOpenedListener{
         MakepadWebSocket webSocket = new MakepadWebSocket(id, url, callback);
         mActiveWebsockets.put(id, webSocket);
         webSocket.connect();
-    
+
         if (webSocket.isConnected()) {
             MakepadWebSocketReader reader = new MakepadWebSocketReader(this, webSocket);
             mWebSocketsHandler.post(reader);
@@ -418,7 +450,7 @@ MidiManager.OnDeviceOpenedListener{
 
     public String[] getAudioDevices(long flag){
         try{
-          
+
             AudioManager am = (AudioManager)this.getSystemService(Context.AUDIO_SERVICE);
             AudioDeviceInfo[] devices = null;
             ArrayList<String> out = new ArrayList<String>();
@@ -432,9 +464,9 @@ MidiManager.OnDeviceOpenedListener{
                 int[] channel_counts = device.getChannelCounts();
                 for(int cc: channel_counts){
                     out.add(String.format(
-                        "%d$$%d$$%d$$%s", 
-                        device.getId(), 
-                        device.getType(), 
+                        "%d$$%d$$%d$$%s",
+                        device.getId(),
+                        device.getType(),
                         cc,
                         device.getProductName().toString()
                     ));
@@ -443,7 +475,7 @@ MidiManager.OnDeviceOpenedListener{
             return out.toArray(new String[0]);
         }
         catch(Exception e){
-            Log.e("Makepad", "exception: " + e.getMessage());             
+            Log.e("Makepad", "exception: " + e.getMessage());
             Log.e("Makepad", "exception: " + e.toString());
             return null;
         }
@@ -452,9 +484,9 @@ MidiManager.OnDeviceOpenedListener{
     @SuppressWarnings("deprecation")
     public void openAllMidiDevices(long delay){
         Runnable runnable = () -> {
-            try{                                
+            try{
                 BluetoothManager bm = (BluetoothManager) this.getSystemService(Context.BLUETOOTH_SERVICE);
-                BluetoothAdapter ba = bm.getAdapter();   
+                BluetoothAdapter ba = bm.getAdapter();
                 Set<BluetoothDevice> bluetooth_devices = ba.getBondedDevices();
                 ArrayList<String> bt_names = new ArrayList<String>();
                 MidiManager mm = (MidiManager)this.getSystemService(Context.MIDI_SERVICE);
@@ -481,7 +513,7 @@ MidiManager.OnDeviceOpenedListener{
                 }
             }
             catch(Exception e){
-                Log.e("Makepad", "exception: " + e.getMessage());             
+                Log.e("Makepad", "exception: " + e.getMessage());
                 Log.e("Makepad", "exception: " + e.toString());
             }
         };
@@ -516,6 +548,13 @@ MidiManager.OnDeviceOpenedListener{
         mVideoPlaybackHandler.post(runnable);
     }
 
+    public void beginVideoPlayback(long videoId) {
+        VideoPlayerRunnable runnable = mVideoPlayerRunnables.get(videoId);
+        if(runnable != null) {
+            runnable.beginPlayback();
+        }
+    }
+
     public void pauseVideoPlayback(long videoId) {
         VideoPlayerRunnable runnable = mVideoPlayerRunnables.get(videoId);
         if(runnable != null) {
@@ -548,6 +587,20 @@ MidiManager.OnDeviceOpenedListener{
         VideoPlayerRunnable runnable = mVideoPlayerRunnables.remove(videoId);
         if(runnable != null) {
             runnable.cleanupVideoPlaybackResources();
+            runnable = null;
         }
+    }
+
+    public boolean isEmulator() {
+        // hints that the app is running on emulator
+        return Build.MODEL.startsWith("sdk")
+            || "google_sdk".equals(Build.MODEL)
+            || Build.MODEL.contains("Emulator")
+            || Build.MODEL.contains("Android SDK")
+            || Build.MODEL.toLowerCase().contains("droid4x")
+            || Build.FINGERPRINT.startsWith("generic")
+            || Build.PRODUCT == "sdk"
+            || Build.PRODUCT == "google_sdk"
+            || (Build.BRAND.startsWith("generic") && Build.DEVICE.startsWith("generic"));
     }
 }

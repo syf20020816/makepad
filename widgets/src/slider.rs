@@ -21,6 +21,13 @@ pub enum SliderType {
     Rotary = shader_enum(3),
 }
 
+impl LiveHook for Slider{
+    fn after_new_from_doc(&mut self, _cx:&mut Cx){
+        self.set_internal(self.default);
+        self.update_text_input();
+    }
+}
+
 
 #[derive(Live, LiveHook, LiveRegister)]
 #[repr(C)]
@@ -30,7 +37,7 @@ pub struct DrawSlider {
     #[live] slider_type: SliderType
 }
 
-#[derive(Live, LiveHook, Widget)]
+#[derive(Live, Widget)]
 pub struct Slider {
     #[redraw] #[live] draw_slider: DrawSlider,
     
@@ -51,13 +58,13 @@ pub struct Slider {
     #[live] min: f64,
     #[live] max: f64,
     #[live] step: f64,
+    #[live] default: f64,
     
     #[live] bind: String,
     
     #[rust] pub value: f64,
     #[rust] pub dragging: Option<f64>,
 }
-
 
 #[derive(Clone, Debug, DefaultNone)]
 pub enum SliderAction {
@@ -86,7 +93,7 @@ impl Slider {
         old != self.value
     }
     
-    pub fn update_text_input(&mut self, cx: &mut Cx) {
+    pub fn update_text_input(&mut self) {
         let e = self.to_external();
         self.text_input.text = match self.precision{
             0=>format!("{:.0}",e),
@@ -100,7 +107,11 @@ impl Slider {
             _=>format!("{}",e)
         };
         self.text_input.select_all();
-        self.text_input.redraw(cx)
+    }
+    
+    pub fn update_text_input_and_redraw(&mut self, cx: &mut Cx) {
+        self.update_text_input();
+        self.text_input.redraw(cx);
     }
     
     pub fn draw_walk_slider(&mut self, cx: &mut Cx2d, walk: Walk) {
@@ -137,11 +148,11 @@ impl Widget for Slider {
                     if let Ok(v) = value.parse::<f64>() {
                         self.set_internal(v.max(self.min).min(self.max));
                     }
-                    self.update_text_input(cx);
+                    self.update_text_input_and_redraw(cx);
                     cx.widget_action(uid, &scope.path, SliderAction::TextSlide(self.to_external()));
                 }
                 TextInputAction::Escape => {
-                    self.update_text_input(cx);
+                    self.update_text_input_and_redraw(cx);
                 }
                 _ => ()
             }
@@ -185,7 +196,7 @@ impl Widget for Slider {
                     self.value = (start_pos + rel.x / fe.rect.size.x).max(0.0).min(1.0);
                     self.set_internal(self.to_external());
                     self.draw_slider.redraw(cx);
-                    self.update_text_input(cx);
+                    self.update_text_input_and_redraw(cx);
                     cx.widget_action(uid, &scope.path, SliderAction::Slide(self.to_external()));
                 }
             }
@@ -214,7 +225,7 @@ impl Widget for Slider {
                 if self.set_internal(value) {
                     self.redraw(cx)
                 }
-                self.update_text_input(cx);
+                self.update_text_input_and_redraw(cx);
             }
         }
     }
@@ -226,12 +237,20 @@ impl Widget for Slider {
     fn set_text(&mut self, v: &str) {
         if let Ok(v) = v.parse::<f64>(){
             self.set_internal(v);
+            self.update_text_input()
         }
     }
         
 }
 
 impl SliderRef{
+    pub fn value(&self)->Option<f64>{
+        if let Some(inner) = self.borrow(){
+            return Some(inner.to_external())
+        }
+        return None
+    }
+    
     pub fn slided(&self, actions:&Actions)->Option<f64>{
         if let Some(item) = actions.find_widget_action(self.widget_uid()) {
             match item.cast(){

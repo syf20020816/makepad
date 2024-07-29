@@ -1,4 +1,4 @@
-#![cfg_attr(all(unix, use_unstable_unix_socket_ancillary_data_2021), feature(unix_socket_ancillary_data))]
+//#![cfg_attr(all(unix), feature(unix_socket_ancillary_data))]
 
 pub mod os;
 
@@ -21,6 +21,7 @@ pub mod thread;
 pub mod audio;
 pub mod midi;
 pub mod video;
+pub mod scope;
 
 mod draw_matrix;
 mod draw_shader; 
@@ -48,6 +49,8 @@ pub mod web_socket;
 
 pub mod audio_stream;
 
+pub mod file_dialogs;
+
 mod media_api;
 
 #[macro_use]
@@ -72,6 +75,8 @@ pub use {
     makepad_shader_compiler::makepad_micro_serde,
     makepad_shader_compiler::makepad_live_compiler,
     makepad_shader_compiler::makepad_live_id,
+    smallvec,
+    smallvec::SmallVec,
     //makepad_image_formats::image,
     makepad_derive_live::*,
     log::*,
@@ -125,6 +130,7 @@ pub use {
         os::*,
         cx_api::CxOsApi,
         media_api::CxMediaApi,
+        scope::*,
         draw_list::{
             CxDrawItem,
             CxRectArea,
@@ -237,8 +243,10 @@ pub use {
             LiveApply,
             LiveHook,
             LiveApplyValue,
+            LiveApplyReset,
             LiveRead,
             ToLiveValue,
+            Apply,
             ApplyFrom,
         },
         animator::{

@@ -5,7 +5,6 @@ use {
         os::raw::{c_void}
     },
     crate::{
-        makepad_objc_sys::runtime::{ObjcId,nil},
         makepad_math::{
             DVec2,
         },
@@ -153,6 +152,10 @@ impl MacosWindow {
             
             let input_context: ObjcId = msg_send![self.view, inputContext];
             let () = msg_send![input_context, invalidateCharacterCoordinates];
+            
+            // lets add an mtk_view object to our view
+            
+            
             
             let () = msg_send![pool, drain];
         }

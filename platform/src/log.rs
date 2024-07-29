@@ -60,11 +60,38 @@ use crate::studio::{AppToStudio,StudioLogItem};
 
 pub fn log_with_level(file_name:&str, line_start:u32, column_start:u32, line_end:u32, column_end:u32, message:String, level:LogLevel){
     // lets send out our log message on the studio websocket 
-
+    #[cfg(target_arch = "wasm32")]{
+        extern "C" {
+            pub fn js_console_log(u8_ptr: u32, len: u32);
+            pub fn js_console_error(u8_ptr: u32, len: u32);
+        }
+        let msg = format!("{}:{}:{} - {}", file_name, line_start, column_start, message);
+        let buf = msg.as_bytes();
+        if let LogLevel::Error = level{
+            unsafe{js_console_error(buf.as_ptr() as u32, buf.len() as u32)};        
+        }
+        else{
+            unsafe{js_console_log(buf.as_ptr() as u32, buf.len() as u32)};        
+        }    
+    }
+    
     if !Cx::has_studio_web_socket() {
+        #[cfg(not (target_os = "android"))]
         println!("{}:{}:{} - {}", file_name, line_start + 1, column_start + 1, message);
+       // if android, also log to ADB
+        #[cfg(target_os = "android")]
+        {
+            use std::ffi::c_int;
+            extern "C" { 
+                pub fn __android_log_write(prio: c_int, tag: *const u8, text: *const u8) -> c_int;
+            }
+            let msg = format!("{}:{}:{} - {}\0", file_name, line_start, column_start, message);
+            unsafe{__android_log_write(3, "Makepad\0".as_ptr(), msg.as_ptr())};
+        }
     }
     else{
+        
+
        Cx::send_studio_message(AppToStudio::LogItem(StudioLogItem{
             file_name: file_name.to_string(),
             line_start,

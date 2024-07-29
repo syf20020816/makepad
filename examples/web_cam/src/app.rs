@@ -68,17 +68,20 @@ impl LiveRegister for App {
 impl MatchEvent for App{
     fn handle_signal(&mut self, cx:&mut Cx){
         while let Ok((id, mut vfb)) = self.video_recv.try_recv() {
-            self.video_input[id].set_format(cx, TextureFormat::VecBGRAu8_32{
-                data: vec![],
-                width: vfb.format.width / 2,
-                height: vfb.format.height
-            });
+            let (current_w, current_h) = self.video_input[id].get_format(cx).vec_width_height().unwrap();
+            if current_w != vfb.format.width / 2 || current_h != vfb.format.height {
+                self.video_input[id] = Texture::new_with_format(cx, TextureFormat::VecBGRAu8_32{
+                    data: vec![],
+                    width: vfb.format.width / 2,
+                    height: vfb.format.height
+                });
+            }
             if let Some(buf) = vfb.as_vec_u32() {
                 self.video_input[id].swap_vec_u32(cx, buf);
             }
             let image_size = [vfb.format.width as f32, vfb.format.height as f32];
             let v = self.ui.view(id!(video_input0));
-            v.as_image().set_texture(Some(self.video_input[id].clone()));
+            v.as_image().set_texture(cx, Some(self.video_input[id].clone()));
             v.set_uniform(cx, id!(image_size), &image_size);
             v.set_uniform(cx, id!(is_rgb), &[0.0]);
             v.redraw(cx);
@@ -94,13 +97,14 @@ impl MatchEvent for App{
     
     fn handle_video_inputs(&mut self, cx:&mut Cx, devices:&VideoInputsEvent){
         log!("{:?}", devices);
-        let input = devices.find_highest_at_res(devices.find_device("FaceTime HD Camera"), 1920, 1080, 30.0);
+        let input = devices.find_highest_at_res(devices.find_device("Logitech BRIO"), 1920, 1080, 31.0);
         cx.use_video_input(&input);
     }
 }
 
 impl AppMain for App {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event) {
+        self.match_event(cx, event);
         self.ui.handle_event(cx, event, &mut Scope::empty());
     }
 }

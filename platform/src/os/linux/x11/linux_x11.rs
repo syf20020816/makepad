@@ -1,5 +1,6 @@
 use {
     std::cell::RefCell,
+    std::time::Instant,
     std::rc::Rc,
     self::super::opengl_x11::{
         OpenglWindow,
@@ -9,13 +10,14 @@ use {
         egl_sys,
         x11::xlib_event::*,
         x11::xlib_app::*,
+        x11::x11_sys,
         linux_media::CxLinuxMedia
     },
     crate::{
         cx_api::{CxOsOp, CxOsApi}, 
         makepad_math::dvec2,
         makepad_live_id::*,
-        thread::Signal,
+        thread::SignalToUI,
         event::Event,
         pass::CxPassParent,
         cx::{Cx, OsType,LinuxWindowParams}, 
@@ -35,6 +37,9 @@ impl Cx {
 
         let opengl_windows = Rc::new(RefCell::new(Vec::new()));
         let is_stdin_loop = std::env::args().find(|v| v=="--stdin-loop").is_some();
+        if is_stdin_loop {
+            cx.borrow_mut().in_makepad_studio = true;
+        }
         init_xlib_app_global(Box::new({
             let cx = cx.clone();
             move | xlib_app,
@@ -56,6 +61,7 @@ impl Cx {
         });
         
         if is_stdin_loop {
+            cx.borrow_mut().in_makepad_studio = true;
             return cx.borrow_mut().stdin_event_loop();
         }
         
@@ -91,8 +97,13 @@ impl Cx {
             XlibEvent::AppLostFocus => { 
                 self.call_event_handler(&Event::AppLostFocus);
             }
-            XlibEvent::WindowGeomChange(re) => { // do this here because mac
+            XlibEvent::WindowGeomChange(mut re) => { // do this here because mac
                 if let Some(window) = opengl_windows.iter_mut().find( | w | w.window_id == re.window_id) {
+                    if let Some(dpi_override) = self.windows[re.window_id].dpi_override {
+                        re.new_geom.inner_size *= re.new_geom.dpi_factor / dpi_override;
+                        re.new_geom.dpi_factor = dpi_override;
+                    }
+                    
                     window.window_geom = re.new_geom.clone();
                     self.windows[re.window_id].window_geom = re.new_geom.clone();
                     // redraw just this windows root draw list
@@ -137,7 +148,7 @@ impl Cx {
                     e.abs,
                     e.time
                 );
-                self.fingers.mouse_down(e.button);
+                self.fingers.mouse_down(e.button, e.window_id);
                 self.call_event_handler(&Event::MouseDown(e.into()))
             }
             XlibEvent::MouseMove(e) => {
@@ -189,7 +200,7 @@ impl Cx {
             XlibEvent::Timer(e) => {
                 //println!("TIMER! {:?}", std::time::Instant::now());
                 if e.timer_id == 0{
-                    if Signal::check_and_clear_ui_signal(){
+                    if SignalToUI::check_and_clear_ui_signal(){
                         self.handle_media_signals();
                         self.call_event_handler(&Event::Signal);
                     }
@@ -200,7 +211,7 @@ impl Cx {
             }
         }
         
-        if self.any_passes_dirty() || self.need_redrawing() || self.new_next_frames.len() != 0 || paint_dirty {
+        if self.any_passes_dirty() || self.need_redrawing() || paint_dirty {
             EventFlow::Poll
         } else {
             EventFlow::Wait
@@ -283,6 +294,13 @@ impl Cx {
                     }
                 },
                 CxOsOp::ShowClipboardActions(_) =>{
+                },
+                CxOsOp::CopyToClipboard(content) => {
+                    if let Some(window) = opengl_windows.get(0) {
+                        unsafe {
+                            xlib_app.copy_to_clipboard(&content, window.xlib_window.window.unwrap(), x11_sys::CurrentTime as u64)
+                        }
+                    }
                 }
                 CxOsOp::FullscreenWindow(_window_id) => {
                     todo!()
@@ -322,12 +340,18 @@ impl Cx {
                     todo!()
                 },
                 CxOsOp::PrepareVideoPlayback(_, _, _, _, _) => todo!(),
+                CxOsOp::BeginVideoPlayback(_) => todo!(),
                 CxOsOp::PauseVideoPlayback(_) => todo!(),
                 CxOsOp::ResumeVideoPlayback(_) => todo!(),
                 CxOsOp::MuteVideoPlayback(_) => todo!(),
                 CxOsOp::UnmuteVideoPlayback(_) => todo!(),
                 CxOsOp::CleanupVideoPlaybackResources(_) => todo!(),
                 CxOsOp::UpdateVideoSurfaceTexture(_) => todo!(),
+
+                CxOsOp::SaveFileDialog(_) => todo!(),
+                CxOsOp::SelectFileDialog(_) => todo!(),
+                CxOsOp::SaveFolderDialog(_) => todo!(),
+                CxOsOp::SelectFolderDialog(_) => todo!(),
             }
         }
         ret
@@ -336,6 +360,7 @@ impl Cx {
 
 impl CxOsApi for Cx {
     fn init_cx_os(&mut self) {
+        self.os.start_time = Some(Instant::now());
         self.live_expand();
         self.live_scan_dependencies();
         self.native_load_dependencies();
@@ -344,13 +369,17 @@ impl CxOsApi for Cx {
     fn spawn_thread<F>(&mut self, f: F) where F: FnOnce() + Send + 'static {
         std::thread::spawn(f);
     }
+    
+    fn seconds_since_app_start(&self)->f64{
+        Instant::now().duration_since(self.os.start_time.unwrap()).as_secs_f64()
+    }
 }
 
 #[derive(Default)]
 pub struct CxOs {
     pub(crate) media: CxLinuxMedia,
     pub (crate) stdin_timers: PollTimers,
-
+    pub (crate) start_time: Option<Instant>,
     // HACK(eddyb) generalize this to EGL, properly.
     pub(super) opengl_cx: Option<OpenglCx>,
 }

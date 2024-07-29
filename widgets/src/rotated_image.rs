@@ -17,22 +17,22 @@ pub struct RotatedImage {
 }
 
 impl ImageCacheImpl for RotatedImage {
-    fn get_texture(&self) -> &Option<Texture> {
+    fn get_texture(&self, _id:usize) -> &Option<Texture> {
         &self.texture
     }
 
-    fn set_texture(&mut self, texture: Option<Texture>) {
+    fn set_texture(&mut self, texture: Option<Texture>, _id:usize) {
         self.texture = texture;
     }
 }
 
 impl LiveHook for RotatedImage {
 
-    fn after_apply(&mut self, cx: &mut Cx, _from: ApplyFrom, _index: usize, _nodes: &[LiveNode]) {
+    fn after_apply(&mut self, cx: &mut Cx, _applyl: &mut Apply, _index: usize, _nodes: &[LiveNode]) {
         self.lazy_create_image_cache(cx);
         let source = self.source.clone();
         if source.as_str().len()>0{
-            self.load_image_dep_by_path(cx, source.as_str())
+            let _ = self.load_image_dep_by_path(cx, source.as_str(), 0);
         }
     }
 }

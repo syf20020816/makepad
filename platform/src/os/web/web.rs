@@ -1,5 +1,6 @@
 
 use {
+    std::panic,
     std::rc::Rc,
     std::cell::RefCell,
     self::super::{
@@ -8,10 +9,9 @@ use {
         to_wasm::*,
     },
     crate::{
-        makepad_live_compiler::LiveFileChange,
         makepad_live_id::*,
         makepad_wasm_bridge::{WasmDataU8, FromWasmMsg, ToWasmMsg, FromWasm, ToWasm},
-        thread::Signal,
+        thread::SignalToUI,
         window::{
             CxWindowPool
         },
@@ -127,7 +127,7 @@ impl Cx {
                 live_id!(ToWasmMouseDown) => {
                     let e: MouseDownEvent = ToWasmMouseDown::read_to_wasm(&mut to_wasm).into();
                     self.fingers.process_tap_count(e.abs, e.time);
-                    self.fingers.mouse_down(e.button);
+                    self.fingers.mouse_down(e.button, e.window_id);
                     self.call_event_handler(&Event::MouseDown(e))
                 }
                 
@@ -245,7 +245,7 @@ impl Cx {
                     let tw = ToWasmHttpResponseProgress::read_to_wasm(&mut to_wasm);
                     network_responses.push(NetworkResponseItem{
                         request_id: LiveId::from_lo_hi(tw.request_id_lo, tw.request_id_hi),
-                        response: NetworkResponse::HttpProgress{loaded:tw.loaded, total:tw.total}
+                        response: NetworkResponse::HttpProgress{loaded:tw.loaded as u64, total:tw.total as u64}
                     });
                 }
 
@@ -253,7 +253,7 @@ impl Cx {
                     let tw = ToWasmHttpUploadProgress::read_to_wasm(&mut to_wasm);
                     network_responses.push(NetworkResponseItem{
                         request_id: LiveId::from_lo_hi(tw.request_id_lo, tw.request_id_hi),
-                        response: NetworkResponse::HttpProgress{loaded:tw.loaded, total:tw.total}
+                        response: NetworkResponse::HttpProgress{loaded:tw.loaded as u64, total:tw.total as u64}
                     });
                 }
                 /*
@@ -294,7 +294,7 @@ impl Cx {
                         response: NetworkResponse::WebSocketBinary(tw.data.into_vec_u8())
                     });
                 }*/
-                live_id!(ToWasmLiveFileChange)=>{
+                /*live_id!(ToWasmLiveFileChange)=>{
                     let tw = ToWasmLiveFileChange::read_to_wasm(&mut to_wasm);
                     // live file change. lets do it.
                     if tw.body.len()>0 {
@@ -307,7 +307,7 @@ impl Cx {
                             }]);
                         }
                     }
-                }
+                }*/
                 live_id!(ToWasmAudioDeviceList)=>{
                     let tw = ToWasmAudioDeviceList::read_to_wasm(&mut to_wasm);
                     self.os.web_audio().lock().unwrap().to_wasm_audio_device_list(tw);
@@ -334,10 +334,6 @@ impl Cx {
             to_wasm.block_skip(skip);
         };
         
-        if self.handle_live_edit(){
-            self.call_event_handler(&Event::LiveEdit);
-            self.redraw_all();
-        }
 
         if let Some(time) = is_animation_frame {
             if self.need_redrawing() {
@@ -350,7 +346,12 @@ impl Cx {
         if network_responses.len() != 0 {
             self.call_event_handler(&Event::NetworkResponses(network_responses));
         }
-
+        
+        if self.handle_live_edit(){ 
+            self.call_event_handler(&Event::LiveEdit);
+            self.redraw_all();
+        }
+        
         self.handle_platform_ops();
         self.handle_media_signals();
         
@@ -428,13 +429,16 @@ impl Cx {
                     self.os.from_wasm(FromWasmXrStopPresenting {});
                 },
                 CxOsOp::ShowTextIME(area, pos) => {
-                    let pos = area.get_clipped_rect(self).pos + pos;
+                    let pos = area.clipped_rect(self).pos + pos;
                     self.os.from_wasm(FromWasmShowTextIME {x: pos.x, y: pos.y});
                 },
                 CxOsOp::HideTextIME => {
                     self.os.from_wasm(FromWasmHideTextIME {});
                 },
                 CxOsOp::ShowClipboardActions(_) =>{
+                }
+                CxOsOp::CopyToClipboard(_) =>{
+                    crate::error!("Clipboard actions not supported in web")
                 }
                 CxOsOp::SetCursor(cursor) => {
                     self.os.from_wasm(FromWasmSetMouseCursor::new(cursor));
@@ -495,12 +499,17 @@ impl Cx {
                     });
                 },*/
                 CxOsOp::PrepareVideoPlayback(_, _, _, _, _) => todo!(),
+                CxOsOp::BeginVideoPlayback(_) => todo!(),
                 CxOsOp::PauseVideoPlayback(_) => todo!(),
                 CxOsOp::ResumeVideoPlayback(_) => todo!(),
                 CxOsOp::MuteVideoPlayback(_) => todo!(),
                 CxOsOp::UnmuteVideoPlayback(_) => todo!(),
                 CxOsOp::CleanupVideoPlaybackResources(_) => todo!(),
                 CxOsOp::UpdateVideoSurfaceTexture(_) => todo!(),
+                CxOsOp::SaveFileDialog(_) => todo!(),
+                CxOsOp::SelectFileDialog(_) => todo!(),
+                CxOsOp::SaveFolderDialog(_) => todo!(),
+                CxOsOp::SelectFolderDialog(_) => todo!(),    
             }
         }
     }
@@ -509,6 +518,7 @@ impl Cx {
 
 impl CxOsApi for Cx {
     fn init_cx_os(&mut self) {
+        self.live_registry.borrow_mut().package_root = Some("".to_string());
         self.live_expand();
         self.live_scan_dependencies();
         
@@ -547,7 +557,6 @@ impl CxOsApi for Cx {
             ToWasmMidiInputData::to_js_code(),
             ToWasmMidiPortList::to_js_code(),
             ToWasmAudioDeviceList::to_js_code(),
-            ToWasmLiveFileChange::to_js_code()
         ]);
         
         self.os.append_from_wasm_js(&[
@@ -574,7 +583,8 @@ impl CxOsApi for Cx {
             FromWasmAllocArrayBuffer::to_js_code(),
             FromWasmAllocIndexBuffer::to_js_code(),
             FromWasmAllocVao::to_js_code(),
-            FromWasmAllocTextureImage2D::to_js_code(),
+            FromWasmAllocTextureImage2D_BGRAu8_32::to_js_code(),
+            FromWasmAllocTextureImage2D_Ru8::to_js_code(),
             FromWasmBeginRenderTexture::to_js_code(),
             FromWasmBeginRenderCanvas::to_js_code(),
             FromWasmSetDefaultDepthAndBlendMode::to_js_code(),
@@ -589,12 +599,17 @@ impl CxOsApi for Cx {
         ]);
     }
     
+    fn seconds_since_app_start(&self)->f64{
+        0.0
+    }
+    
     fn spawn_thread<F>(&mut self, f: F) where F: FnOnce() + Send + 'static {
         let closure_box: Box<dyn FnOnce() + Send + 'static> = Box::new(f);
         let context_ptr = Box::into_raw(Box::new(closure_box));
-        self.os.from_wasm(FromWasmCreateThread {context_ptr: context_ptr as u32});
+        self.os.from_wasm(FromWasmCreateThread {context_ptr: context_ptr as u32, timer:0});
     }
     
+        
     /*
     fn start_midi_input(&mut self) {
         self.platform.from_wasm(FromWasmStartMidiInput {
@@ -610,6 +625,14 @@ impl CxOsApi for Cx {
     }*/
 }
 
+impl Cx{
+    pub(crate) fn spawn_timer_thread<F>(&mut self, timer:u32, f: F) where F: Fn() + Send + 'static {
+        let closure_box: Box<dyn Fn() + Send + 'static> = Box::new(f);
+        let context_ptr = Box::into_raw(Box::new(closure_box));
+        self.os.from_wasm(FromWasmCreateThread {context_ptr: context_ptr as u32, timer});
+    }
+}
+
 extern "C" {
     pub fn js_post_signal(signal_hi: u32, signal_lo: u32);
 }
@@ -621,6 +644,14 @@ pub unsafe extern "C" fn wasm_thread_entrypoint(closure_ptr: u32) {
     closure();
 }
 
+#[export_name = "wasm_thread_timer_entrypoint"]
+#[cfg(target_arch = "wasm32")]
+pub unsafe extern "C" fn wasm_thread_timer_entrypoint(closure_ptr: u32) {
+    let closure = Box::from_raw(closure_ptr as *mut Box<dyn Fn() + Send + 'static>);
+    closure();
+    Box::into_raw(closure);
+} 
+
 #[export_name = "wasm_thread_alloc_tls_and_stack"]
 #[cfg(target_arch = "wasm32")]
 pub unsafe extern "C" fn wasm_thread_alloc_tls_and_stack(tls_size: u32) -> u32 {
@@ -631,11 +662,10 @@ pub unsafe extern "C" fn wasm_thread_alloc_tls_and_stack(tls_size: u32) -> u32 {
 }
 
 // storage buffers for graphics API related platform
-#[derive(Default)]
 pub struct CxOs {
     pub (crate) window_geom: WindowGeom,
     
-    pub (crate) from_wasm: Option<FromWasmMsg>,
+    pub  from_wasm: Option<FromWasmMsg>,
     
     pub (crate) vertex_buffers: usize,
     pub (crate) index_buffers: usize,
@@ -649,8 +679,28 @@ pub struct CxOs {
     pub (crate) media: CxWebMedia,
 }
 
+impl Default for CxOs{
+    fn default()->Self{
+        Self{
+            window_geom: WindowGeom::default(),
+                    
+            from_wasm: Some(FromWasmMsg::new()),
+                    
+            vertex_buffers: 0,
+            index_buffers: 0,
+            vaos: 0,
+                    
+            xr_last_inputs: None,
+                    
+            to_wasm_js: Vec::new(),
+            from_wasm_js: Vec::new(),
+                    
+            media: CxWebMedia::default(),
+        }
+    }
+}
+
 impl CxOs {
-    
     pub fn append_to_wasm_js(&mut self, strs: &[String]) {
         self.to_wasm_js.extend_from_slice(strs);
     }
@@ -690,7 +740,7 @@ pub unsafe extern "C" fn wasm_get_js_message_bridge(cx_ptr: u32) -> u32 {
 #[export_name = "wasm_check_signal"]
 #[cfg(target_arch = "wasm32")]
 pub unsafe extern "C" fn wasm_check_signal() -> u32 {
-    if Signal::check_and_clear_ui_signal(){
+    if SignalToUI::check_and_clear_ui_signal(){
         1
     }
     else{
@@ -698,6 +748,14 @@ pub unsafe extern "C" fn wasm_check_signal() -> u32 {
     }
 }
 
+#[export_name = "wasm_init_panic_hook"]
+pub unsafe extern "C" fn init_panic_hook() {
+    pub fn panic_hook(info: &panic::PanicInfo) {
+        crate::error!("{}", info)
+    }
+    panic::set_hook(Box::new(panic_hook));
+}
 
 #[no_mangle]
 pub static mut BASE_ADDR: usize = 10;
+

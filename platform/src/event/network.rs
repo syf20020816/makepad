@@ -16,7 +16,7 @@ pub type NetworkResponsesEvent = Vec<NetworkResponseItem>;
 pub enum NetworkResponse{
     HttpRequestError(String),
     HttpResponse(HttpResponse),
-    HttpProgress{loaded:u32, total:u32},
+    HttpProgress{loaded:u64, total:u64},
 }
 
 pub struct NetworkResponseIter<I> {
@@ -56,7 +56,17 @@ pub struct HttpRequest {
     pub url: String,
     pub method: HttpMethod,
     pub headers: BTreeMap<String, Vec<String>>,
+    pub ignore_ssl_cert: bool,
     pub body: Option<Vec<u8>>,
+}
+
+#[derive(Debug)]
+pub struct SplitUrl<'a>{
+    pub proto: &'a str,
+    pub host: &'a str,
+    pub port: &'a str,
+    pub file: &'a str,
+    pub hash: &'a str,
 }
 
 impl HttpRequest { 
@@ -65,9 +75,38 @@ impl HttpRequest {
             metadata_id: LiveId(0),
             url,
             method,
+            ignore_ssl_cert: false,
             headers: BTreeMap::new(),
             body: None
         }
+    }
+
+    pub fn split_url(&self)->SplitUrl{
+        let (proto, rest) = self.url.split_once("://").unwrap_or((&self.url, "http://"));
+        let (host, port, rest) = if let Some((host, rest)) = rest.split_once(":"){
+            let (port, rest) = rest.split_once("/").unwrap_or((rest, ""));
+            (host, port, rest)
+        }
+        else{
+            let (host, rest) = rest.split_once("/").unwrap_or((rest, ""));
+            (host,match proto{
+                "http"|"ws"=>"80",
+                "https"|"wss"=>"443",
+                _=>"80"
+            },rest)
+        };
+        let (file, hash) = rest.split_once("#").unwrap_or((rest, ""));
+        return SplitUrl{
+            proto,
+            host,
+            port,
+            file, 
+            hash
+        }
+    }
+    
+    pub fn set_ignore_ssl_cert(&mut self){
+        self.ignore_ssl_cert = true
     }
     
     pub fn set_metadata_id(&mut self, id: LiveId){

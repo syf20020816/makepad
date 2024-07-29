@@ -7,7 +7,6 @@ use {
         collections::{HashMap},
         sync::Once,
         fmt,
-        cmp,
     }
 };
 
@@ -101,7 +100,7 @@ impl LiveIdInterner {
     }
 }
 
-#[derive(Clone, Default, Eq, Hash, Copy, PartialEq)]
+#[derive(Clone, Default, Eq, Hash, Copy, Ord, PartialOrd, PartialEq)]
 pub struct LiveId(pub u64);
 
 pub const LIVE_ID_SEED:u64 = 0xd6e8_feb8_6659_fd93;
@@ -158,9 +157,49 @@ impl LiveId {
         Self ((x & 0x7fff_ffff_ffff_ffff) | 0x8000_0000_0000_0000)
     }
     
+    pub fn add(&self, what:u64)->Self{
+        Self(self.0 + what)
+    }
+    
+    pub fn xor(&self, what:u64)->Self{
+        Self((self.0 ^ what)| 0x8000_0000_0000_0000)
+    }
+    
+    pub fn sub(&self, what:u64)->Self{
+        Self(self.0 - what)
+    }
+        
     pub const fn from_str(id_str: &str) -> Self {
         let bytes = id_str.as_bytes();
         Self::from_bytes(LIVE_ID_SEED, bytes, 0, bytes.len())
+    }
+    
+    pub const fn from_bytes_lc(seed:u64, id_bytes: &[u8], start: usize, end: usize) -> Self {
+        let mut x = seed;
+        let mut i = start;
+        while i < end {
+            let byte = id_bytes[i];
+            let byte = if byte >= 65 && byte <=90{
+                byte + 32
+            }
+            else{
+                byte
+            };
+            x = x.overflowing_add(byte as u64).0;
+            x ^= x >> 32;
+            x = x.overflowing_mul(0xd6e8_feb8_6659_fd93).0;
+            x ^= x >> 32;
+            x = x.overflowing_mul(0xd6e8_feb8_6659_fd93).0;
+            x ^= x >> 32;
+            i += 1;
+        }
+        // mark high bit as meaning that this is a hash id
+        Self ((x & 0x7fff_ffff_ffff_ffff) | 0x8000_0000_0000_0000)
+    }
+        
+    pub const fn from_str_lc(id_str: &str) -> Self {
+        let bytes = id_str.as_bytes();
+        Self::from_bytes_lc(LIVE_ID_SEED, bytes, 0, bytes.len())
     }
     
     pub const fn str_append(self, id_str: &str) -> Self {
@@ -229,7 +268,7 @@ impl LiveId {
 }
 
 pub (crate) static UNIQUE_LIVE_ID: AtomicU64 = AtomicU64::new(1);
-
+/*
 impl Ord for LiveId {
     fn cmp(&self, other: &LiveId) -> cmp::Ordering {
         LiveIdInterner::with( | idmap | {
@@ -247,7 +286,7 @@ impl PartialOrd for LiveId {
     fn partial_cmp(&self, other: &LiveId) -> Option<cmp::Ordering> {
         Some(self.cmp(other))
     }
-}
+}*/
 
 impl fmt::Debug for LiveId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

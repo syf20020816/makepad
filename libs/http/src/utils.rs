@@ -1,5 +1,4 @@
 use std::net::{TcpStream, Shutdown, SocketAddr};
-use std::io::Write;
 use std::io::BufReader;
 use std::io::prelude::*;
 
@@ -59,6 +58,7 @@ pub fn parse_url_path(url: &str) -> Option<(String, Option<String>)> {
     Some((url, search))
 }
 
+#[derive(Debug)]
 pub struct HttpServerHeaders {
     pub addr: SocketAddr,
     pub lines: Vec<String>,

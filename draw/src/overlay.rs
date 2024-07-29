@@ -39,7 +39,7 @@ impl LiveNew for Overlay {
 }
 
 impl LiveApply for Overlay {
-    fn apply(&mut self, _cx: &mut Cx, _from: ApplyFrom, index: usize, nodes: &[LiveNode]) -> usize {
+    fn apply(&mut self, _cx: &mut Cx, _applyl: &mut Apply, index: usize, nodes: &[LiveNode]) -> usize {
         nodes.skip_node(index)
     }
 }
@@ -73,10 +73,10 @@ impl Overlay {
         // this means it didn't 
         for i in 0..cx.draw_lists[self.draw_list.id()].draw_items.len(){
             if let Some(sub_id) = cx.draw_lists[self.draw_list.id()].draw_items[i].sub_list(){
-                let cfp = cx.draw_lists[sub_id].codeflow_parent_id.unwrap();
-                if cx.draw_lists[cfp].redraw_id != cx.draw_lists[sub_id].redraw_id{
-                    
-                    cx.draw_lists[self.draw_list.id()].clear_sub_list(sub_id);
+                if let Some(cfp) = cx.draw_lists[sub_id].codeflow_parent_id{
+                    if cx.draw_lists[cfp].redraw_id != cx.draw_lists[sub_id].redraw_id{
+                        cx.draw_lists[self.draw_list.id()].clear_sub_list(sub_id);
+                    }
                 }
             }
         }

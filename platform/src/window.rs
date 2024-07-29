@@ -19,6 +19,10 @@ pub struct WindowHandle(PoolId);
 #[derive(Clone, Debug, PartialEq, Copy)]
 pub struct WindowId(usize, u64);
 
+impl WindowId{
+    pub fn id(&self)->usize{self.0}
+}
+
 impl WindowHandle {
     pub fn window_id(&self) -> WindowId {WindowId(self.0.id, self.0.generation)}
 }
@@ -30,8 +34,48 @@ impl CxWindowPool {
         WindowHandle(self.0.alloc())
     }
     
+    pub fn window_id_contains(&self, pos:DVec2)->(WindowId, DVec2){
+        for (index,item) in self.0.pool.iter().enumerate(){
+            let window = &item.item;
+            if pos.x>= window.window_geom.position.x &&
+                pos.y>= window.window_geom.position.y && 
+                pos.x<= window.window_geom.position.x+window.window_geom.inner_size.x  &&
+                pos.y<= window.window_geom.position.y+window.window_geom.inner_size.y{
+                return (WindowId(index, item.generation), window.window_geom.position)
+            }
+        }
+        return (WindowId(0, self.0.pool[0].generation), self.0.pool[0].item.window_geom.position)
+    }
+    
+    
+    pub fn relative_to_window_id(&self, pos:DVec2)->(WindowId, DVec2){
+        for (index,item) in self.0.pool.iter().enumerate(){
+            let window = &item.item;
+            if pos.x>= window.window_geom.position.x &&
+            pos.y>= window.window_geom.position.y && 
+            pos.x<= window.window_geom.position.x+window.window_geom.inner_size.x  &&
+            pos.y<= window.window_geom.position.x+window.window_geom.inner_size.y{
+                return (WindowId(index, item.generation), window.window_geom.position)
+            }
+        }
+        return (WindowId(0, self.0.pool[0].generation), self.0.pool[0].item.window_geom.position)
+    }
+    
+    pub fn is_valid(&self, v: WindowId)->bool{
+        if v.0 < self.0.pool.len(){
+            if self.0.pool[v.0].generation == v.1{
+                return true
+            }
+        }
+        false
+    }
+    
     pub fn id_zero()->WindowId{
         WindowId(0, 0)
+    }
+    
+    pub fn from_usize(v:usize)->WindowId{
+        WindowId(v, 0)
     }
 }
 
@@ -81,7 +125,7 @@ impl LiveNew for WindowHandle {
 }
 impl LiveApply for WindowHandle {
     //fn type_id(&self)->std::any::TypeId{ std::any::TypeId::of::<Self>()}
-    fn apply(&mut self, cx: &mut Cx, from: ApplyFrom, start_index: usize, nodes: &[LiveNode]) -> usize {
+    fn apply(&mut self, cx: &mut Cx, apply: &mut Apply, start_index: usize, nodes: &[LiveNode]) -> usize {
         
         if !nodes[start_index].value.is_structy_type() {
             cx.apply_error_wrong_type_for_struct(live_error_origin!(), start_index, nodes, live_id!(View));
@@ -96,21 +140,29 @@ impl LiveApply for WindowHandle {
             }
             match nodes[index].id {
                 live_id!(inner_size) => {
-                    let v:Vec2 = LiveNew::new_apply_mut_index(cx, from, &mut index, nodes);
+                    let v:Vec2 = LiveNew::new_apply_mut_index(cx, apply, &mut index, nodes);
                     cx.windows[self.window_id()].create_inner_size = Some(v.into());
                 },
                 live_id!(title) => {
-                    let v = LiveNew::new_apply_mut_index(cx, from, &mut index, nodes);
+                    let v = LiveNew::new_apply_mut_index(cx, apply, &mut index, nodes);
                     cx.windows[self.window_id()].create_title = v;
                 }
+                live_id!(kind_id) => {
+                    let v = LiveNew::new_apply_mut_index(cx, apply, &mut index, nodes);
+                    cx.windows[self.window_id()].kind_id = v;
+                }
                 live_id!(position) => {
-                    let v:Vec2 = LiveNew::new_apply_mut_index(cx, from, &mut index, nodes);
+                    let v:Vec2 = LiveNew::new_apply_mut_index(cx, apply, &mut index, nodes);
                     cx.windows[self.window_id()].create_position = Some(v.into());
                 }
                 live_id!(dpi_override) => {
-                    let v:f64 = LiveNew::new_apply_mut_index(cx, from, &mut index, nodes);
+                    let v:f64 = LiveNew::new_apply_mut_index(cx, apply, &mut index, nodes);
                     //log!("DPI OVERRIDE {}", v);
                     cx.windows[self.window_id()].dpi_override = Some(v);
+                }
+                live_id!(topmost) => {
+                    let v:bool = LiveNew::new_apply_mut_index(cx, apply, &mut index, nodes);
+                    self.set_topmost(cx, v);
                 }
                 _ => {
                     cx.apply_error_no_matching_field(live_error_origin!(), index, nodes);
@@ -135,6 +187,10 @@ impl WindowHandle {
     
     pub fn get_position(&mut self, cx: &mut Cx) -> DVec2 {
         cx.windows[self.window_id()].get_position()
+    }
+    
+    pub fn set_kind_id(&mut self, cx: &mut Cx,kind_id:usize) {
+        cx.windows[self.window_id()].kind_id = kind_id;
     }
     
     pub fn minimize(&mut self, cx: &mut Cx) {
@@ -187,6 +243,7 @@ pub struct CxWindow {
     pub create_title: String,
     pub create_position: Option<DVec2>,
     pub create_inner_size: Option<DVec2>,
+    pub kind_id: usize,
     pub dpi_override: Option<f64>,
     pub is_created: bool,
     pub window_geom: WindowGeom,

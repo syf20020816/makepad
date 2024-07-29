@@ -1,7 +1,6 @@
 use std::{
     collections::HashMap,
     hash::Hash,
-    convert::TryInto,
     str,
 };
 
@@ -117,6 +116,23 @@ impl DeBin for u8 {
 impl SerBin for u8 {
     fn ser_bin(&self, s: &mut Vec<u8>) {
         s.push(*self);
+    }
+}
+
+impl DeBin for i8 {
+    fn de_bin(o:&mut usize, d:&[u8]) -> Result<i8,DeBinErr> {
+        if *o + 1 > d.len(){
+            return Err(DeBinErr{o:*o, l:1, s:d.len(), msg:"u8".to_string()})
+        } 
+        let m = d[*o];
+        *o += 1;
+        Ok(m as i8)
+    }
+}
+
+impl SerBin for i8 {
+    fn ser_bin(&self, s: &mut Vec<u8>) {
+        s.push(*self as u8);
     }
 }
 
@@ -297,6 +313,20 @@ impl<A,B,C,D> SerBin for (A,B,C,D) where A: SerBin, B:SerBin, C:SerBin, D:SerBin
 
 impl<A,B,C,D> DeBin for (A,B,C,D) where A:DeBin, B:DeBin, C:DeBin, D:DeBin{
     fn de_bin(o:&mut usize, d:&[u8])->Result<(A,B,C,D), DeBinErr> {Ok((DeBin::de_bin(o,d)?,DeBin::de_bin(o,d)?,DeBin::de_bin(o,d)?,DeBin::de_bin(o,d)?))}
+}
+
+impl<A,B,C,D,E> SerBin for (A,B,C,D,E) where A: SerBin, B:SerBin, C:SerBin, D:SerBin, E:SerBin {
+    fn ser_bin(&self, s: &mut Vec<u8>) {
+        self.0.ser_bin(s);
+        self.1.ser_bin(s);
+        self.2.ser_bin(s);
+        self.3.ser_bin(s);
+        self.4.ser_bin(s);
+    }
+}
+
+impl<A,B,C,D,E> DeBin for (A,B,C,D,E) where A:DeBin, B:DeBin, C:DeBin, D:DeBin, E:DeBin{
+    fn de_bin(o:&mut usize, d:&[u8])->Result<(A,B,C,D,E), DeBinErr> {Ok((DeBin::de_bin(o,d)?,DeBin::de_bin(o,d)?,DeBin::de_bin(o,d)?,DeBin::de_bin(o,d)?,DeBin::de_bin(o,d)?))}
 }
 
 impl<K, V> SerBin for HashMap<K, V> where K: SerBin,

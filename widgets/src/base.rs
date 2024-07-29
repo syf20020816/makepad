@@ -14,6 +14,8 @@ live_design!{
     import crate::fold_button::FoldButtonBase;
     import crate::fold_header::FoldHeaderBase;
     import crate::image::ImageBase;
+    import crate::image_blend::ImageBlendBase;
+    import crate::icon::IconBase;
     import crate::rotated_image::RotatedImageBase;
     import crate::video::VideoBase;
     import crate::popup_menu::PopupMenuBase;
@@ -39,12 +41,30 @@ live_design!{
     import crate::text_input::TextInputBase;
     import crate::scroll_shadow::DrawScrollShadowBase;
     import crate::page_flip::PageFlipBase;
+    import crate::stack_navigation::StackNavigationViewBase;
+    import crate::stack_navigation::StackNavigationBase;
+    import crate::expandable_panel::ExpandablePanelBase;
     import crate::keyboard_view::KeyboardViewBase;
     import crate::window_menu::WindowMenuBase;
+    import crate::html::HtmlBase;
+    import crate::html::HtmlLinkBase;
+    import crate::markdown::MarkdownBase,
+    import crate::root::RootBase;
     
+    import crate::designer::DesignerBase;
+    import crate::designer_outline::DesignerOutlineBase;
+    import crate::designer_view::DesignerViewBase;
+    import crate::designer_view::DesignerContainerBase;
+    import crate::designer_outline_tree::DesignerOutlineTreeBase;
+    import crate::designer_outline_tree::DesignerOutlineTreeNodeBase;
+    import crate::designer_toolbox::DesignerToolboxBase
+    import crate::color_picker::ColorPicker;
+    
+    import crate::bare_step::BareStep;
+    import crate::turtle_step::TurtleStep;
     import makepad_draw::shader::std::*;
     import makepad_draw::shader::draw_color::DrawColor;
-    
+
     SlidePanel = <SlidePanelBase>{
         animator: {
             closed = {
@@ -74,6 +94,24 @@ live_design!{
         }
     }
 
+    Icon = <IconBase> {
+        width: Fit,
+        height: Fit,
+
+        icon_walk: {
+            margin: {left: 5.0},
+            width: Fit,
+            height: Fit,
+        }
+
+        draw_bg: {
+            instance color: #0000,
+            fn pixel(self) -> vec4 {
+                return self.color;
+            }
+        }
+    }
+
     Image = <ImageBase> {
         width: 100
         height: 100
@@ -99,8 +137,75 @@ live_design!{
         }
     }
     
+    ImageBlend = <ImageBlendBase> {
+        width: 100
+        height: 100
+                
+        draw_bg: {
+            texture image0: texture2d
+            texture image1: texture2d
+            instance opacity: 1.0
+            instance blend: 0.0
+            instance image_scale: vec2(1.0, 1.0)
+            instance image_pan: vec2(0.0, 0.0)
+            instance breathe: 0.0            
+            fn get_color_scale_pan(self, scale: vec2, pan: vec2) -> vec4 {
+                let b = 1.0 - 0.1*self.breathe;
+                let s = vec2(0.05*self.breathe);
+                return mix(
+                    sample2d(self.image0, self.pos * scale*b + pan+s).xyzw,
+                    sample2d(self.image1, self.pos * scale*b + pan+s).xyzw,
+                    self.blend
+                )
+            }
+            
+            fn get_color(self) -> vec4 {
+                return self.get_color_scale_pan(self.image_scale, self.image_pan)
+            }
+                        
+            fn pixel(self) -> vec4 {
+                let color = self.get_color();
+                return Pal::premul(vec4(color.xyz, color.w * self.opacity))
+            }
+        }
+                
+        animator: {
+            blend = {
+                default: zero,
+                zero = {
+                    from: {all: Forward {duration: 0.1}}
+                    apply: {
+                        draw_bg: {blend: 0.0}
+                    }
+                }
+                one = {
+                    from: {
+                        all: Forward {duration: 0.1}
+                    }
+                    apply: {
+                        draw_bg: {blend: 1.0}
+                    }
+                }
+            } 
+            breathe = {
+                default: off,
+                on = {
+                    from: {all: BounceLoop {duration: 10., end:1.0}}
+                    apply:{
+                        draw_bg:{breathe:[{time: 0.0, value: 0.0}, {time:1.0,value:1.0}]}
+                    }
+                }
+                off = {
+                    from: {all: Forward {duration: 1}}
+                    apply:{
+                        draw_bg:{breathe:0.0}
+                    }
+                }
+            }
+        }
+    }
+      
     RotatedImage = <RotatedImageBase> {
-        
         width: Fit
         height: Fit
         
@@ -201,17 +306,69 @@ live_design!{
     }
 
     Video = <VideoBase> {
+        width: 100, height: 100
+
         draw_bg: {
             shape: Solid,
             fill: Image
-            texture image: textureOES
+            texture video_texture: textureOES
+            texture thumbnail_texture: texture2d
+            uniform show_thumbnail: 0.0
+
+            instance opacity: 1.0
             instance image_scale: vec2(1.0, 1.0)
-            instance image_pan: vec2(0.0, 0.0)
-            uniform is_last_frame: 0.0
+            instance image_pan: vec2(0.5, 0.5)
+
+            uniform source_size: vec2(1.0, 1.0)
+            uniform target_size: vec2(-1.0, -1.0)
+
+            fn get_color_scale_pan(self) -> vec4 {
+                // Early return for default scaling and panning,
+                // used when walk size is not specified or non-fixed.
+                if self.target_size.x <= 0.0 && self.target_size.y <= 0.0 {
+                    if self.show_thumbnail > 0.0 {
+                        return sample2d(self.thumbnail_texture, self.pos).xyzw;
+                    } else {
+                        return sample2dOES(self.video_texture, self.pos);
+                    }  
+                }
+
+                let scale = self.image_scale;
+                let pan = self.image_pan;
+                let source_aspect_ratio = self.source_size.x / self.source_size.y;
+                let target_aspect_ratio = self.target_size.x / self.target_size.y;
+
+                // Adjust scale based on aspect ratio difference
+                if (source_aspect_ratio != target_aspect_ratio) {
+                    if (source_aspect_ratio > target_aspect_ratio) {
+                        scale.x = target_aspect_ratio / source_aspect_ratio;
+                        scale.y = 1.0;
+                    } else {
+                        scale.x = 1.0;
+                        scale.y = source_aspect_ratio / target_aspect_ratio;
+                    }
+                }
+
+                // Calculate the range for panning
+                let pan_range_x = max(0.0, (1.0 - scale.x));
+                let pan_range_y = max(0.0, (1.0 - scale.y));
+
+                // Adjust the user pan values to be within the pan range
+                let adjusted_pan_x = pan_range_x * pan.x;
+                let adjusted_pan_y = pan_range_y * pan.y;
+                let adjusted_pan = vec2(adjusted_pan_x, adjusted_pan_y);
+                let adjusted_pos = (self.pos * scale) + adjusted_pan;
+
+                if self.show_thumbnail > 0.5 {
+                    return sample2d(self.thumbnail_texture, adjusted_pos).xyzw;
+                } else {
+                    return sample2dOES(self.video_texture, adjusted_pos);
+                }      
+            }
 
             fn pixel(self) -> vec4 {
-                let color = sample2dOES(self.image, self.pos);
-                return color * vec4(1.0, 1.0, 1.0, 0.8);
+                let color = self.get_color_scale_pan();
+                return Pal::premul(vec4(color.xyz, color.w * self.opacity));
             }
         }
     }
@@ -265,6 +422,132 @@ live_design!{
         }
     }}
     
+    RectShadowView = <ViewBase> {
+        clip_x:false,
+        clip_y:false,
+        
+        show_bg: true, draw_bg: {
+        instance border_width: 0.0
+        instance border_color: #0000
+        instance shadow_color: #0007
+        instance shadow_offset: vec2(0.0,0.0)
+        instance shadow_radius: 10.0
+        
+        varying rect_size2: vec2,
+        varying rect_size3: vec2,
+        varying sdf_rect_pos: vec2,
+        varying sdf_rect_size: vec2,
+        varying rect_pos2: vec2,     
+        varying rect_shift: vec2,  
+            
+        fn get_color(self) -> vec4 {
+            return self.color
+        }
+        
+        fn vertex(self) -> vec4 {
+            let min_offset = min(self.shadow_offset,vec2(0));
+            self.rect_size2 = self.rect_size + 2.0*vec2(self.shadow_radius);
+            self.rect_size3 = self.rect_size2 + abs(self.shadow_offset);
+            self.rect_pos2 = self.rect_pos - vec2(self.shadow_radius) + min_offset;
+            self.rect_shift = -min_offset;
+            self.sdf_rect_size = self.rect_size2 - vec2(self.shadow_radius * 2.0 + self.border_width * 2.0)
+            self.sdf_rect_pos = -min_offset + vec2(self.border_width + self.shadow_radius);
+            return self.clip_and_transform_vertex(self.rect_pos2, self.rect_size3)
+        }
+                                    
+        fn get_border_color(self) -> vec4 {
+            return self.border_color
+        }
+                            
+        fn pixel(self) -> vec4 {
+            
+            let sdf = Sdf2d::viewport(self.pos * self.rect_size3)
+            sdf.rect(
+                self.sdf_rect_pos.x,
+                self.sdf_rect_pos.y,
+                self.sdf_rect_size.x,
+                self.sdf_rect_size.y 
+            )
+            if sdf.shape > -1.0{ // try to skip the expensive gauss shadow
+                let m = self.shadow_radius;
+                let o = self.shadow_offset + self.rect_shift;
+                let v = GaussShadow::box_shadow(vec2(m) + o, self.rect_size2+o, self.pos * (self.rect_size3+vec2(m)) , m*0.5);
+                sdf.clear(self.shadow_color*v)
+            }
+                                                
+            sdf.fill_keep(self.get_color())
+            if self.border_width > 0.0 {
+                sdf.stroke(self.get_border_color(), self.border_width)
+            }
+            return sdf.result
+        }
+    }}
+        
+    RoundedShadowView = <ViewBase>{
+        clip_x:false,
+        clip_y:false,
+                
+        show_bg: true, draw_bg: {
+            color:#8
+            instance border_width: 0.0
+            instance border_color: #0000
+            instance shadow_color: #0007
+            instance shadow_radius: 20.0,
+            instance shadow_offset: vec2(0.0,0.0)
+            instance radius: 2.5
+                            
+            varying rect_size2: vec2,
+            varying rect_size3: vec2,
+            varying rect_pos2: vec2,     
+            varying rect_shift: vec2,    
+            varying sdf_rect_pos: vec2,
+            varying sdf_rect_size: vec2,
+                              
+            fn get_color(self) -> vec4 {
+                return self.color
+            }
+                            
+            fn vertex(self) -> vec4 {
+                let min_offset = min(self.shadow_offset,vec2(0));
+                self.rect_size2 = self.rect_size + 2.0*vec2(self.shadow_radius);
+                self.rect_size3 = self.rect_size2 + abs(self.shadow_offset);
+                self.rect_pos2 = self.rect_pos - vec2(self.shadow_radius) + min_offset;
+                self.sdf_rect_size = self.rect_size2 - vec2(self.shadow_radius * 2.0 + self.border_width * 2.0)
+                self.sdf_rect_pos = -min_offset + vec2(self.border_width + self.shadow_radius);
+                self.rect_shift = -min_offset;
+                                        
+                return self.clip_and_transform_vertex(self.rect_pos2, self.rect_size3)
+            }
+                                        
+            fn get_border_color(self) -> vec4 {
+                return self.border_color
+            }
+                                
+            fn pixel(self) -> vec4 {
+                                            
+                let sdf = Sdf2d::viewport(self.pos * self.rect_size3)
+                sdf.box(
+                    self.sdf_rect_pos.x,
+                    self.sdf_rect_pos.y,
+                    self.sdf_rect_size.x,
+                    self.sdf_rect_size.y, 
+                    max(1.0, self.radius)
+                )
+                if sdf.shape > -1.0{ // try to skip the expensive gauss shadow
+                    let m = self.shadow_radius;
+                    let o = self.shadow_offset + self.rect_shift;
+                    let v = GaussShadow::rounded_box_shadow(vec2(m) + o, self.rect_size2+o, self.pos * (self.rect_size3+vec2(m)), self.shadow_radius*0.5, self.radius*2.0);
+                    sdf.clear(self.shadow_color*v)
+                }
+                                                
+                sdf.fill_keep(self.get_color())
+                if self.border_width > 0.0 {
+                    sdf.stroke(self.get_border_color(), self.border_width)
+                }
+                return sdf.result
+            }
+        }}
+    
     RoundedView = <ViewBase> {show_bg: true, draw_bg: {
         instance border_width: 0.0
         instance border_color: #0000
@@ -295,6 +578,7 @@ live_design!{
             return sdf.result;
         }
     }}
+    
     
     RoundedXView = <ViewBase> {show_bg: true, draw_bg: {
         instance border_width: 0.0
@@ -522,11 +806,99 @@ live_design!{
             }
         }
     }
+
+    CachedRoundedView = <ViewBase> {
+                
+        optimize: Texture,
+        draw_bg: {
+            instance border_width: 0.0
+            instance border_color: #0000
+            instance inset: vec4(0.0, 0.0, 0.0, 0.0)
+            instance radius: 2.5
+            
+            texture image: texture2d
+            uniform marked: float,
+            varying scale: vec2
+            varying shift: vec2
+                        
+            fn get_border_color(self) -> vec4 {
+                return self.border_color
+            }
+                    
+            fn vertex(self) -> vec4 {
+                let dpi = self.dpi_factor;
+                let ceil_size = ceil(self.rect_size * dpi) / dpi
+                let floor_pos = floor(self.rect_pos * dpi) / dpi
+                self.scale = self.rect_size / ceil_size;
+                self.shift = (self.rect_pos - floor_pos) / ceil_size;
+                return self.clip_and_transform_vertex(self.rect_pos, self.rect_size)
+            }
+            
+            fn pixel(self) -> vec4 {
+                
+                let sdf = Sdf2d::viewport(self.pos * self.rect_size)
+                sdf.box(
+                    self.inset.x + self.border_width,
+                    self.inset.y + self.border_width,
+                    self.rect_size.x - (self.inset.x + self.inset.z + self.border_width * 2.0),
+                    self.rect_size.y - (self.inset.y + self.inset.w + self.border_width * 2.0),
+                    max(1.0, self.radius)
+                )
+                let color = sample2d_rt(self.image, self.pos * self.scale + self.shift);
+                sdf.fill_keep_premul(color);
+                if self.border_width > 0.0 {
+                    sdf.stroke(self.get_border_color(), self.border_width)
+                }
+                return sdf.result;
+            }
+        }
+    }
+
+    ExpandablePanel = <ExpandablePanelBase> {
+        flow: Overlay,
+        width: Fill,
+        height: Fill,
+
+        initial_offset: 400.0;
+
+        body = <View> {}
+
+        panel = <View> {
+            flow: Down,
+            width: Fill,
+            height: Fit,
+
+            show_bg: true,
+            draw_bg: {
+                color: #FFF
+            }
+
+            align: { x: 0.5, y: 0 }
+            padding: 20,
+            spacing: 10,
+
+            scroll_handler = <RoundedView> {
+                width: 40,
+                height: 6,
+
+                show_bg: true,
+                draw_bg: {
+                    color: #333
+                    radius: 2.
+                }
+            }
+        }
+    }
+    
     MultiWindow = <MultiWindowBase>{}
     PageFlip = <PageFlipBase>{}
     KeyboardView = <KeyboardViewBase>{}
     // todo fix this by allowing reexporting imports
-    // for now this works too
+    // for now this works too\
+    RootBase = <RootBase>{}
+    HtmlBase = <HtmlBase>{}
+    HtmlLinkBase = <HtmlLinkBase>{}
+    MarkdownBase = <MarkdownBase>{}
     KeyboardViewBase = <KeyboardViewBase>{}
     PageFlipBase = <PageFlipBase>{}
     ViewBase = <ViewBase>{}
@@ -542,6 +914,7 @@ live_design!{
     FoldButtonBase = <FoldButtonBase> {}
     FoldHeaderBase = <FoldHeaderBase> {}
     ImageBase = <ImageBase> {}
+    IconBase = <IconBase> {}
     RotatedImageBase = <RotatedImageBase> {}
     VideoBase = <VideoBase> {}
     LabelBase = <LabelBase> {}
@@ -564,4 +937,18 @@ live_design!{
     TextInputBase = <TextInputBase>{}
     DrawScrollShadowBase = <DrawScrollShadowBase>{}
     WindowMenuBase = <WindowMenuBase>{}
+    StackNavigationViewBase = <StackNavigationViewBase>{}
+    StackNavigationBase = <StackNavigationBase>{}
+    ExpandablePanelBase = <ExpandablePanelBase>{}
+    BareStep = <BareStep>{}
+    TurtleStep = <TurtleStep>{}
+    ColorPicker = <ColorPicker>{}
+    
+    DesignerBase = <DesignerBase>{}
+    DesignerOutlineBase = <DesignerOutlineBase>{}
+    DesignerViewBase = <DesignerViewBase>{}
+    DesignerContainerBase = <DesignerContainerBase>{}
+    DesignerOutlineTreeBase = <DesignerOutlineTreeBase> {}
+    DesignerOutlineTreeNodeBase = <DesignerOutlineTreeNodeBase> {}
+    DesignerToolboxBase = <DesignerToolboxBase> {}
 }
