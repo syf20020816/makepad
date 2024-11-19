@@ -1,0 +1,604 @@
+2024-11-13 08:28:33 INFO rust_pixel::game Simple Game(rust_pixel) start..."/Users/shengyifei/projects/makepad/makepad/examples/simple"
+
+2024-11-13 08:28:33 INFO rust_pixel::game Init game...
+
+2024-11-13 08:29:04 INFO rust_pixel::game Simple Game(rust_pixel) start..."/Users/shengyifei/projects/makepad/makepad/examples/simple"
+
+2024-11-13 08:29:04 INFO rust_pixel::game Init game...
+
+2024-11-13 08:29:04 INFO rust_pixel::render::panel panel init size...Rect { x: 0, y: 0, width: 82, height: 40 }
+
+2024-11-13 08:29:04 INFO rust_pixel::asset asset load:"/Users/shengyifei/projects/makepad/makepad/examples/simple/assets/back.txt"
+
+2024-11-13 08:29:04 INFO rust_pixel::game Begin run...
+
+2024-11-13 08:29:04 TRACE mio::poll registering event source with poller: token=Token(0), interests=READABLE
+
+2024-11-13 08:29:04 TRACE mio::poll registering event source with poller: token=Token(1), interests=READABLE
+
+2024-11-13 08:29:30 INFO rust_pixel::game Simple Game(rust_pixel) start..."/Users/shengyifei/projects/makepad/makepad/examples/simple"
+
+2024-11-13 08:29:30 INFO rust_pixel::game Init game...
+
+2024-11-13 08:29:30 INFO rust_pixel::render::panel panel init size...Rect { x: 0, y: 0, width: 82, height: 40 }
+
+2024-11-13 08:29:30 INFO rust_pixel::asset asset load:"/Users/shengyifei/projects/makepad/makepad/examples/simple/assets/back.txt"
+
+2024-11-13 08:29:30 INFO rust_pixel::game Begin run...
+
+2024-11-13 08:29:30 TRACE mio::poll registering event source with poller: token=Token(0), interests=READABLE
+
+2024-11-13 08:29:30 TRACE mio::poll registering event source with poller: token=Token(1), interests=READABLE
+
+2024-11-13 08:34:01 INFO rust_pixel::game Simple Game(rust_pixel) start..."/Users/shengyifei/projects/makepad/makepad/examples/simple"
+
+2024-11-13 08:34:01 INFO rust_pixel::game Init game...
+
+2024-11-13 08:34:01 INFO rust_pixel::render::panel panel init size...Rect { x: 0, y: 0, width: 82, height: 40 }
+
+2024-11-13 08:34:01 INFO rust_pixel::asset asset load:"/Users/shengyifei/projects/makepad/makepad/examples/simple/assets/back.txt"
+
+2024-11-13 08:34:01 INFO rust_pixel::game Begin run...
+
+2024-11-13 08:34:01 TRACE mio::poll registering event source with poller: token=Token(0), interests=READABLE
+
+2024-11-13 08:34:01 TRACE mio::poll registering event source with poller: token=Token(1), interests=READABLE
+
+2024-11-13 09:06:11 INFO rust_pixel::game Simple Game(rust_pixel) start..."/Users/shengyifei/projects/makepad/makepad/examples/simple"
+
+2024-11-13 09:06:11 INFO rust_pixel::game Init game...
+
+2024-11-13 09:06:11 INFO rust_pixel::render::panel panel init size...Rect { x: 0, y: 0, width: 82, height: 40 }
+
+2024-11-13 09:06:11 INFO rust_pixel::asset asset load:"/Users/shengyifei/projects/makepad/makepad/examples/simple/assets/back.txt"
+
+2024-11-13 09:28:42 INFO rust_pixel::game Simple Game(rust_pixel) start..."/Users/shengyifei/projects/makepad/makepad/examples/simple"
+
+2024-11-13 09:28:42 INFO rust_pixel::game Init game...
+
+2024-11-13 09:28:42 INFO rust_pixel::render::panel panel init size...Rect { x: 0, y: 0, width: 82, height: 40 }
+
+2024-11-13 09:28:42 INFO rust_pixel::asset asset load:"/Users/shengyifei/projects/makepad/makepad/examples/simple/assets/back.txt"
+
+2024-11-13 09:33:17 INFO rust_pixel::game Simple Game(rust_pixel) start..."/Users/shengyifei/projects/makepad/makepad/examples/simple"
+
+2024-11-13 09:33:17 INFO rust_pixel::game Init game...
+
+2024-11-13 09:33:17 INFO rust_pixel::render::panel panel init size...Rect { x: 0, y: 0, width: 82, height: 40 }
+
+2024-11-13 09:33:17 INFO rust_pixel::asset asset load:"/Users/shengyifei/projects/makepad/makepad/examples/simple/assets/back.txt"
+
+2024-11-13 09:39:56 INFO rust_pixel::game Simple Game(rust_pixel) start..."/Users/shengyifei/projects/makepad/makepad/examples/simple"
+
+2024-11-13 09:39:56 INFO rust_pixel::game Init game...
+
+2024-11-13 09:39:56 INFO rust_pixel::render::panel panel init size...Rect { x: 0, y: 0, width: 82, height: 40 }
+
+2024-11-13 09:39:56 INFO rust_pixel::asset asset load:"/Users/shengyifei/projects/makepad/makepad/examples/simple/assets/back.txt"
+
+2024-11-13 09:45:10 INFO rust_pixel::game Simple Game(rust_pixel) start..."/Users/shengyifei/projects/makepad/makepad/examples/simple"
+
+2024-11-13 09:45:10 INFO rust_pixel::game Init game...
+
+2024-11-13 09:45:10 INFO rust_pixel::render::panel panel init size...Rect { x: 0, y: 0, width: 82, height: 40 }
+
+2024-11-13 09:45:10 INFO rust_pixel::asset asset load:"/Users/shengyifei/projects/makepad/makepad/examples/simple/assets/back.txt"
+
+2024-11-13 09:45:10 INFO rust_pixel::game Begin run...
+
+2024-11-13 09:45:10 TRACE mio::poll registering event source with poller: token=Token(0), interests=READABLE
+
+2024-11-13 09:45:10 TRACE mio::poll registering event source with poller: token=Token(1), interests=READABLE
+
+2024-11-15 04:51:07 INFO rust_pixel::game Simple Game(rust_pixel) start..."/Users/shengyifei/projects/makepad/makepad/examples/simple"
+
+2024-11-15 04:51:07 INFO rust_pixel::game Init game...
+
+2024-11-15 04:51:07 INFO rust_pixel::render::adapter::sdl gl_pixel load texture.../Users/shengyifei/projects/makepad/makepad/examples/simple/assets/pix/c64.png
+
+2024-11-15 04:51:07 INFO rust_pixel::render::adapter::sdl symbol_w=8 symbol_h=8
+
+2024-11-15 04:51:07 INFO rust_pixel::render::adapter::sdl pixel_w=1344 pixel_h=672
+
+2024-11-15 04:51:07 INFO rust_pixel::render::adapter::gl::render_symbols symbols len...16384, texh=1024 texw=1024 th=128 tw=128
+
+2024-11-15 04:51:07 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(2)
+
+2024-11-15 04:51:07 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(3)
+
+2024-11-15 04:51:07 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(4)
+
+2024-11-15 04:51:07 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(5)
+
+2024-11-15 04:51:07 INFO rust_pixel::render::adapter::sdl Window & gl init ok...
+
+2024-11-15 04:51:07 INFO rust_pixel::render::panel panel init size...Rect { x: 0, y: 0, width: 82, height: 40 }
+
+2024-11-15 04:51:07 INFO rust_pixel::asset asset load:"/Users/shengyifei/projects/makepad/makepad/examples/simple/assets/back.txt"
+
+2024-11-15 04:51:56 INFO rust_pixel::game Simple Game(rust_pixel) start..."/Users/shengyifei/projects/makepad/makepad/examples/simple"
+
+2024-11-15 04:51:56 INFO rust_pixel::game Init game...
+
+2024-11-15 04:51:56 INFO rust_pixel::render::adapter::sdl gl_pixel load texture.../Users/shengyifei/projects/makepad/makepad/examples/simple/assets/pix/c64.png
+
+2024-11-15 04:51:56 INFO rust_pixel::render::adapter::sdl symbol_w=8 symbol_h=8
+
+2024-11-15 04:51:56 INFO rust_pixel::render::adapter::sdl pixel_w=1344 pixel_h=672
+
+2024-11-15 04:51:56 INFO rust_pixel::render::adapter::gl::render_symbols symbols len...16384, texh=1024 texw=1024 th=128 tw=128
+
+2024-11-15 04:51:56 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(2)
+
+2024-11-15 04:51:56 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(3)
+
+2024-11-15 04:51:56 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(4)
+
+2024-11-15 04:51:56 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(5)
+
+2024-11-15 04:51:56 INFO rust_pixel::render::adapter::sdl Window & gl init ok...
+
+2024-11-15 04:51:56 INFO rust_pixel::render::panel panel init size...Rect { x: 0, y: 0, width: 82, height: 40 }
+
+2024-11-15 04:51:56 INFO rust_pixel::asset asset load:"/Users/shengyifei/projects/makepad/makepad/examples/simple/assets/back.txt"
+
+2024-11-15 04:51:56 INFO rust_pixel::game Begin run...
+
+2024-11-15 04:56:31 INFO rust_pixel::game Simple Game(rust_pixel) start..."/Users/shengyifei/projects/makepad/makepad/examples/simple"
+
+2024-11-15 04:56:31 INFO rust_pixel::game Init game...
+
+2024-11-15 04:56:31 INFO rust_pixel::render::adapter::sdl gl_pixel load texture.../Users/shengyifei/projects/makepad/makepad/examples/simple/assets/pix/c64.png
+
+2024-11-15 04:56:31 INFO rust_pixel::render::adapter::sdl symbol_w=8 symbol_h=8
+
+2024-11-15 04:56:31 INFO rust_pixel::render::adapter::sdl pixel_w=1344 pixel_h=672
+
+2024-11-15 04:56:31 INFO rust_pixel::render::adapter::gl::render_symbols symbols len...16384, texh=1024 texw=1024 th=128 tw=128
+
+2024-11-15 04:56:31 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(2)
+
+2024-11-15 04:56:31 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(3)
+
+2024-11-15 04:56:31 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(4)
+
+2024-11-15 04:56:31 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(5)
+
+2024-11-15 04:56:31 INFO rust_pixel::render::adapter::sdl Window & gl init ok...
+
+2024-11-15 04:56:31 INFO rust_pixel::render::panel panel init size...Rect { x: 0, y: 0, width: 82, height: 40 }
+
+2024-11-15 04:56:31 INFO rust_pixel::asset asset load:"/Users/shengyifei/projects/makepad/makepad/examples/simple/assets/back.txt"
+
+2024-11-15 04:56:31 INFO rust_pixel::game Begin run...
+
+2024-11-15 05:00:41 INFO rust_pixel::game Simple Game(rust_pixel) start..."/Users/shengyifei/projects/makepad/makepad/examples/simple"
+
+2024-11-15 05:00:41 INFO rust_pixel::game Init game...
+
+2024-11-15 05:00:41 INFO rust_pixel::render::adapter::sdl gl_pixel load texture.../Users/shengyifei/projects/makepad/makepad/examples/simple/assets/pix/c64.png
+
+2024-11-15 05:00:41 INFO rust_pixel::render::adapter::sdl symbol_w=8 symbol_h=8
+
+2024-11-15 05:00:41 INFO rust_pixel::render::adapter::sdl pixel_w=1344 pixel_h=672
+
+2024-11-15 05:00:41 INFO rust_pixel::render::adapter::gl::render_symbols symbols len...16384, texh=1024 texw=1024 th=128 tw=128
+
+2024-11-15 05:00:41 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(2)
+
+2024-11-15 05:00:41 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(3)
+
+2024-11-15 05:00:41 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(4)
+
+2024-11-15 05:00:41 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(5)
+
+2024-11-15 05:00:41 INFO rust_pixel::render::adapter::sdl Window & gl init ok...
+
+2024-11-15 05:00:41 INFO rust_pixel::render::panel panel init size...Rect { x: 0, y: 0, width: 82, height: 40 }
+
+2024-11-15 05:00:41 INFO rust_pixel::asset asset load:"/Users/shengyifei/projects/makepad/makepad/examples/simple/assets/back.txt"
+
+2024-11-15 05:00:41 INFO rust_pixel::game Begin run...
+
+2024-11-15 05:08:19 INFO rust_pixel::game Simple Game(rust_pixel) start..."/Users/shengyifei/projects/makepad/makepad/examples/simple"
+
+2024-11-15 05:08:19 INFO rust_pixel::game Init game...
+
+2024-11-15 05:08:20 INFO rust_pixel::render::adapter::sdl gl_pixel load texture.../Users/shengyifei/projects/makepad/makepad/examples/simple/assets/pix/c64.png
+
+2024-11-15 05:08:20 INFO rust_pixel::render::adapter::sdl symbol_w=8 symbol_h=8
+
+2024-11-15 05:08:20 INFO rust_pixel::render::adapter::sdl pixel_w=1344 pixel_h=672
+
+2024-11-15 05:08:20 INFO rust_pixel::render::adapter::gl::render_symbols symbols len...16384, texh=1024 texw=1024 th=128 tw=128
+
+2024-11-15 05:08:20 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(2)
+
+2024-11-15 05:08:20 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(3)
+
+2024-11-15 05:08:20 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(4)
+
+2024-11-15 05:08:20 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(5)
+
+2024-11-15 05:08:20 INFO rust_pixel::render::adapter::sdl Window & gl init ok...
+
+2024-11-15 05:08:20 INFO rust_pixel::render::panel panel init size...Rect { x: 0, y: 0, width: 82, height: 40 }
+
+2024-11-15 05:08:20 INFO rust_pixel::asset asset load:"/Users/shengyifei/projects/makepad/makepad/examples/simple/assets/back.txt"
+
+2024-11-15 05:08:20 INFO rust_pixel::game Begin run...
+
+2024-11-15 05:14:06 INFO rust_pixel::game Simple Game(rust_pixel) start..."/Users/shengyifei/projects/makepad/makepad/examples/simple"
+
+2024-11-15 05:14:06 INFO rust_pixel::game Init game...
+
+2024-11-15 05:14:06 INFO rust_pixel::render::adapter::sdl gl_pixel load texture.../Users/shengyifei/projects/makepad/makepad/examples/simple/assets/pix/c64.png
+
+2024-11-15 05:14:06 INFO rust_pixel::render::adapter::sdl symbol_w=8 symbol_h=8
+
+2024-11-15 05:14:06 INFO rust_pixel::render::adapter::sdl pixel_w=1344 pixel_h=672
+
+2024-11-15 05:14:06 INFO rust_pixel::render::adapter::gl::render_symbols symbols len...16384, texh=1024 texw=1024 th=128 tw=128
+
+2024-11-15 05:14:06 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(2)
+
+2024-11-15 05:14:06 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(3)
+
+2024-11-15 05:14:06 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(4)
+
+2024-11-15 05:14:06 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(5)
+
+2024-11-15 05:14:06 INFO rust_pixel::render::adapter::sdl Window & gl init ok...
+
+2024-11-15 05:14:06 INFO rust_pixel::render::panel panel init size...Rect { x: 0, y: 0, width: 82, height: 40 }
+
+2024-11-15 05:14:06 INFO rust_pixel::asset asset load:"/Users/shengyifei/projects/makepad/makepad/examples/simple/assets/back.txt"
+
+2024-11-15 05:18:54 INFO rust_pixel::game Simple Game(rust_pixel) start..."/Users/shengyifei/projects/makepad/makepad/examples/simple"
+
+2024-11-15 05:18:54 INFO rust_pixel::game Init game...
+
+2024-11-15 05:18:54 INFO rust_pixel::render::adapter::sdl gl_pixel load texture.../Users/shengyifei/projects/makepad/makepad/examples/simple/assets/pix/c64.png
+
+2024-11-15 05:18:54 INFO rust_pixel::render::adapter::sdl symbol_w=8 symbol_h=8
+
+2024-11-15 05:18:54 INFO rust_pixel::render::adapter::sdl pixel_w=1344 pixel_h=672
+
+2024-11-15 05:18:54 INFO rust_pixel::render::adapter::gl::render_symbols symbols len...16384, texh=1024 texw=1024 th=128 tw=128
+
+2024-11-15 05:18:54 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(2)
+
+2024-11-15 05:18:54 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(3)
+
+2024-11-15 05:18:54 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(4)
+
+2024-11-15 05:18:54 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(5)
+
+2024-11-15 05:18:54 INFO rust_pixel::render::adapter::sdl Window & gl init ok...
+
+2024-11-15 05:18:54 INFO rust_pixel::render::panel panel init size...Rect { x: 0, y: 0, width: 82, height: 40 }
+
+2024-11-15 05:18:54 INFO rust_pixel::asset asset load:"/Users/shengyifei/projects/makepad/makepad/examples/simple/assets/back.txt"
+
+2024-11-15 05:18:54 INFO rust_pixel::game Begin run...
+
+2024-11-15 05:19:32 INFO rust_pixel::game Simple Game(rust_pixel) start..."/Users/shengyifei/projects/makepad/makepad/examples/simple"
+
+2024-11-15 05:19:32 INFO rust_pixel::game Init game...
+
+2024-11-15 05:19:32 INFO rust_pixel::render::adapter::sdl gl_pixel load texture.../Users/shengyifei/projects/makepad/makepad/examples/simple/assets/pix/c64.png
+
+2024-11-15 05:19:32 INFO rust_pixel::render::adapter::sdl symbol_w=8 symbol_h=8
+
+2024-11-15 05:19:32 INFO rust_pixel::render::adapter::sdl pixel_w=1344 pixel_h=672
+
+2024-11-15 05:19:32 INFO rust_pixel::render::adapter::gl::render_symbols symbols len...16384, texh=1024 texw=1024 th=128 tw=128
+
+2024-11-15 05:19:32 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(2)
+
+2024-11-15 05:19:32 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(3)
+
+2024-11-15 05:19:32 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(4)
+
+2024-11-15 05:19:32 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(5)
+
+2024-11-15 05:19:32 INFO rust_pixel::render::adapter::sdl Window & gl init ok...
+
+2024-11-15 05:19:32 INFO rust_pixel::render::panel panel init size...Rect { x: 0, y: 0, width: 82, height: 40 }
+
+2024-11-15 05:19:32 INFO rust_pixel::asset asset load:"/Users/shengyifei/projects/makepad/makepad/examples/simple/assets/back.txt"
+
+2024-11-15 05:19:32 INFO rust_pixel::game Begin run...
+
+2024-11-16 01:57:21 INFO rust_pixel::game Simple Game(rust_pixel) start..."/Users/shengyifei/projects/makepad/makepad/examples/simple"
+
+2024-11-16 01:57:21 INFO rust_pixel::game Init game...
+
+2024-11-16 01:57:21 INFO rust_pixel::render::adapter::sdl gl_pixel load texture.../Users/shengyifei/projects/makepad/makepad/examples/simple/assets/pix/c64.png
+
+2024-11-16 01:57:21 INFO rust_pixel::render::adapter::sdl symbol_w=8 symbol_h=8
+
+2024-11-16 01:57:21 INFO rust_pixel::render::adapter::sdl pixel_w=1344 pixel_h=672
+
+2024-11-16 01:57:21 INFO rust_pixel::render::adapter::gl::render_symbols symbols len...16384, texh=1024 texw=1024 th=128 tw=128
+
+2024-11-16 01:57:21 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(2)
+
+2024-11-16 01:57:21 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(3)
+
+2024-11-16 01:57:21 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(4)
+
+2024-11-16 01:57:21 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(5)
+
+2024-11-16 01:57:21 INFO rust_pixel::render::adapter::sdl Window & gl init ok...
+
+2024-11-16 01:57:21 INFO rust_pixel::render::panel panel init size...Rect { x: 0, y: 0, width: 82, height: 40 }
+
+2024-11-16 01:57:21 INFO rust_pixel::asset asset load:"/Users/shengyifei/projects/makepad/makepad/examples/simple/assets/back.txt"
+
+2024-11-16 01:57:21 INFO rust_pixel::game Begin run...
+
+2024-11-19 02:59:13 INFO rust_pixel::game Simple Game(rust_pixel) start..."/Users/shengyifei/projects/makepad/makepad/examples/simple"
+
+2024-11-19 02:59:13 INFO rust_pixel::game Init game...
+
+2024-11-19 02:59:13 INFO rust_pixel::render::adapter::sdl gl_pixel load texture.../Users/shengyifei/projects/makepad/makepad/examples/simple/assets/pix/c64.png
+
+2024-11-19 02:59:13 INFO rust_pixel::render::adapter::sdl symbol_w=8 symbol_h=8
+
+2024-11-19 02:59:13 INFO rust_pixel::render::adapter::sdl pixel_w=1344 pixel_h=672
+
+2024-11-19 02:59:13 INFO rust_pixel::render::adapter::gl::render_symbols symbols len...16384, texh=1024 texw=1024 th=128 tw=128
+
+2024-11-19 02:59:13 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(2)
+
+2024-11-19 02:59:13 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(3)
+
+2024-11-19 02:59:13 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(4)
+
+2024-11-19 02:59:13 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(5)
+
+2024-11-19 02:59:13 INFO rust_pixel::render::adapter::sdl Window & gl init ok...
+
+2024-11-19 02:59:13 INFO rust_pixel::render::panel panel init size...Rect { x: 0, y: 0, width: 82, height: 40 }
+
+2024-11-19 02:59:13 INFO rust_pixel::asset asset load:"/Users/shengyifei/projects/makepad/makepad/examples/simple/assets/back.txt"
+
+2024-11-19 02:59:13 INFO rust_pixel::game Begin run...
+
+2024-11-19 05:03:02 INFO rust_pixel::game Simple Game(rust_pixel) start..."/Users/shengyifei/projects/makepad/makepad/examples/simple"
+
+2024-11-19 05:03:02 INFO rust_pixel::game Init game...
+
+2024-11-19 05:03:02 INFO rust_pixel::render::adapter::sdl gl_pixel load texture.../Users/shengyifei/projects/makepad/makepad/examples/simple/assets/pix/c64.png
+
+2024-11-19 05:03:02 INFO rust_pixel::render::adapter::sdl symbol_w=8 symbol_h=8
+
+2024-11-19 05:03:02 INFO rust_pixel::render::adapter::sdl pixel_w=1344 pixel_h=672
+
+2024-11-19 05:03:02 INFO rust_pixel::render::adapter::gl::render_symbols symbols len...16384, texh=1024 texw=1024 th=128 tw=128
+
+2024-11-19 05:03:02 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(2)
+
+2024-11-19 05:03:02 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(3)
+
+2024-11-19 05:03:02 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(4)
+
+2024-11-19 05:03:02 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(5)
+
+2024-11-19 05:03:02 INFO rust_pixel::render::adapter::sdl Window & gl init ok...
+
+2024-11-19 05:03:02 INFO rust_pixel::render::panel panel init size...Rect { x: 0, y: 0, width: 82, height: 40 }
+
+2024-11-19 05:03:02 INFO rust_pixel::asset asset load:"/Users/shengyifei/projects/makepad/makepad/examples/simple/assets/back.txt"
+
+2024-11-19 05:03:57 INFO rust_pixel::game Simple Game(rust_pixel) start..."/Users/shengyifei/projects/makepad/makepad/examples/simple"
+
+2024-11-19 05:03:57 INFO rust_pixel::game Init game...
+
+2024-11-19 05:03:57 INFO rust_pixel::render::adapter::sdl gl_pixel load texture.../Users/shengyifei/projects/makepad/makepad/examples/simple/assets/pix/c64.png
+
+2024-11-19 05:03:57 INFO rust_pixel::render::adapter::sdl symbol_w=8 symbol_h=8
+
+2024-11-19 05:03:57 INFO rust_pixel::render::adapter::sdl pixel_w=1344 pixel_h=672
+
+2024-11-19 05:03:57 INFO rust_pixel::render::adapter::gl::render_symbols symbols len...16384, texh=1024 texw=1024 th=128 tw=128
+
+2024-11-19 05:03:57 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(2)
+
+2024-11-19 05:03:57 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(3)
+
+2024-11-19 05:03:57 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(4)
+
+2024-11-19 05:03:57 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(5)
+
+2024-11-19 05:03:57 INFO rust_pixel::render::adapter::sdl Window & gl init ok...
+
+2024-11-19 05:03:57 INFO rust_pixel::render::panel panel init size...Rect { x: 0, y: 0, width: 82, height: 40 }
+
+2024-11-19 05:03:57 INFO rust_pixel::asset asset load:"/Users/shengyifei/projects/makepad/makepad/examples/simple/assets/back.txt"
+
+2024-11-19 05:04:36 INFO rust_pixel::game Simple Game(rust_pixel) start..."/Users/shengyifei/projects/makepad/makepad/examples/simple"
+
+2024-11-19 05:04:36 INFO rust_pixel::game Init game...
+
+2024-11-19 05:04:36 INFO rust_pixel::render::adapter::sdl gl_pixel load texture.../Users/shengyifei/projects/makepad/makepad/examples/simple/assets/pix/c64.png
+
+2024-11-19 05:04:36 INFO rust_pixel::render::adapter::sdl symbol_w=8 symbol_h=8
+
+2024-11-19 05:04:36 INFO rust_pixel::render::adapter::sdl pixel_w=1344 pixel_h=672
+
+2024-11-19 05:04:36 INFO rust_pixel::render::adapter::gl::render_symbols symbols len...16384, texh=1024 texw=1024 th=128 tw=128
+
+2024-11-19 05:04:36 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(2)
+
+2024-11-19 05:04:36 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(3)
+
+2024-11-19 05:04:36 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(4)
+
+2024-11-19 05:04:36 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(5)
+
+2024-11-19 05:04:36 INFO rust_pixel::render::adapter::sdl Window & gl init ok...
+
+2024-11-19 05:04:36 INFO rust_pixel::render::panel panel init size...Rect { x: 0, y: 0, width: 82, height: 40 }
+
+2024-11-19 05:04:36 INFO rust_pixel::asset asset load:"/Users/shengyifei/projects/makepad/makepad/examples/simple/assets/back.txt"
+
+2024-11-19 05:05:15 INFO rust_pixel::game Simple Game(rust_pixel) start..."/Users/shengyifei/projects/makepad/makepad/examples/simple"
+
+2024-11-19 05:05:15 INFO rust_pixel::game Init game...
+
+2024-11-19 05:05:15 INFO rust_pixel::render::adapter::sdl gl_pixel load texture.../Users/shengyifei/projects/makepad/makepad/examples/simple/assets/pix/c64.png
+
+2024-11-19 05:05:15 INFO rust_pixel::render::adapter::sdl symbol_w=8 symbol_h=8
+
+2024-11-19 05:05:15 INFO rust_pixel::render::adapter::sdl pixel_w=1344 pixel_h=672
+
+2024-11-19 05:05:15 INFO rust_pixel::render::adapter::gl::render_symbols symbols len...16384, texh=1024 texw=1024 th=128 tw=128
+
+2024-11-19 05:05:15 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(2)
+
+2024-11-19 05:05:15 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(3)
+
+2024-11-19 05:05:15 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(4)
+
+2024-11-19 05:05:15 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(5)
+
+2024-11-19 05:05:15 INFO rust_pixel::render::adapter::sdl Window & gl init ok...
+
+2024-11-19 05:05:15 INFO rust_pixel::render::panel panel init size...Rect { x: 0, y: 0, width: 82, height: 40 }
+
+2024-11-19 05:05:15 INFO rust_pixel::asset asset load:"/Users/shengyifei/projects/makepad/makepad/examples/simple/assets/back.txt"
+
+2024-11-19 05:05:29 INFO rust_pixel::game Simple Game(rust_pixel) start..."/Users/shengyifei/projects/makepad/makepad/examples/simple"
+
+2024-11-19 05:05:29 INFO rust_pixel::game Init game...
+
+2024-11-19 05:05:29 INFO rust_pixel::render::adapter::sdl gl_pixel load texture.../Users/shengyifei/projects/makepad/makepad/examples/simple/assets/pix/c64.png
+
+2024-11-19 05:05:29 INFO rust_pixel::render::adapter::sdl symbol_w=8 symbol_h=8
+
+2024-11-19 05:05:29 INFO rust_pixel::render::adapter::sdl pixel_w=1344 pixel_h=672
+
+2024-11-19 05:05:29 INFO rust_pixel::render::adapter::gl::render_symbols symbols len...16384, texh=1024 texw=1024 th=128 tw=128
+
+2024-11-19 05:05:29 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(2)
+
+2024-11-19 05:05:29 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(3)
+
+2024-11-19 05:05:29 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(4)
+
+2024-11-19 05:05:29 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(5)
+
+2024-11-19 05:05:29 INFO rust_pixel::render::adapter::sdl Window & gl init ok...
+
+2024-11-19 05:05:29 INFO rust_pixel::render::panel panel init size...Rect { x: 0, y: 0, width: 82, height: 40 }
+
+2024-11-19 05:05:29 INFO rust_pixel::asset asset load:"/Users/shengyifei/projects/makepad/makepad/examples/simple/assets/back.txt"
+
+2024-11-19 05:05:31 INFO rust_pixel::game Begin run...
+
+2024-11-19 08:50:04 INFO rust_pixel::game Simple Game(rust_pixel) start..."/Users/shengyifei/projects/makepad/makepad/examples/simple"
+
+2024-11-19 08:50:04 INFO rust_pixel::game Init game...
+
+2024-11-19 08:50:04 INFO rust_pixel::render::adapter::sdl gl_pixel load texture.../Users/shengyifei/projects/makepad/makepad/examples/simple/assets/pix/c64.png
+
+2024-11-19 08:50:04 INFO rust_pixel::render::adapter::sdl symbol_w=8 symbol_h=8
+
+2024-11-19 08:50:04 INFO rust_pixel::render::adapter::sdl pixel_w=1344 pixel_h=672
+
+2024-11-19 08:50:05 INFO rust_pixel::render::adapter::gl::render_symbols symbols len...16384, texh=1024 texw=1024 th=128 tw=128
+
+2024-11-19 08:50:05 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(2)
+
+2024-11-19 08:50:05 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(3)
+
+2024-11-19 08:50:05 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(4)
+
+2024-11-19 08:50:05 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(5)
+
+2024-11-19 08:50:05 INFO rust_pixel::render::adapter::sdl Window & gl init ok...
+
+2024-11-19 08:50:05 INFO rust_pixel::render::panel panel init size...Rect { x: 0, y: 0, width: 82, height: 40 }
+
+2024-11-19 08:50:05 INFO rust_pixel::asset asset load:"/Users/shengyifei/projects/makepad/makepad/examples/simple/assets/back.txt"
+
+2024-11-19 08:50:49 INFO rust_pixel::game Simple Game(rust_pixel) start..."/Users/shengyifei/projects/makepad/makepad/examples/simple"
+
+2024-11-19 08:50:49 INFO rust_pixel::game Init game...
+
+2024-11-19 08:50:49 INFO rust_pixel::render::adapter::sdl gl_pixel load texture.../Users/shengyifei/projects/makepad/makepad/examples/simple/assets/pix/c64.png
+
+2024-11-19 08:50:49 INFO rust_pixel::render::adapter::sdl symbol_w=8 symbol_h=8
+
+2024-11-19 08:50:49 INFO rust_pixel::render::adapter::sdl pixel_w=1344 pixel_h=672
+
+2024-11-19 08:50:49 INFO rust_pixel::render::adapter::gl::render_symbols symbols len...16384, texh=1024 texw=1024 th=128 tw=128
+
+2024-11-19 08:50:49 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(2)
+
+2024-11-19 08:50:49 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(3)
+
+2024-11-19 08:50:49 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(4)
+
+2024-11-19 08:50:49 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(5)
+
+2024-11-19 08:50:49 INFO rust_pixel::render::adapter::sdl Window & gl init ok...
+
+2024-11-19 08:50:49 INFO rust_pixel::render::panel panel init size...Rect { x: 0, y: 0, width: 82, height: 40 }
+
+2024-11-19 08:50:49 INFO rust_pixel::asset asset load:"/Users/shengyifei/projects/makepad/makepad/examples/simple/assets/back.txt"
+
+2024-11-19 08:51:10 INFO rust_pixel::game Simple Game(rust_pixel) start..."/Users/shengyifei/projects/makepad/makepad/examples/simple"
+
+2024-11-19 08:51:10 INFO rust_pixel::game Init game...
+
+2024-11-19 08:51:10 INFO rust_pixel::render::adapter::sdl gl_pixel load texture.../Users/shengyifei/projects/makepad/makepad/examples/simple/assets/pix/c64.png
+
+2024-11-19 08:51:10 INFO rust_pixel::render::adapter::sdl symbol_w=8 symbol_h=8
+
+2024-11-19 08:51:10 INFO rust_pixel::render::adapter::sdl pixel_w=1344 pixel_h=672
+
+2024-11-19 08:51:10 INFO rust_pixel::render::adapter::gl::render_symbols symbols len...16384, texh=1024 texw=1024 th=128 tw=128
+
+2024-11-19 08:51:10 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(2)
+
+2024-11-19 08:51:10 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(3)
+
+2024-11-19 08:51:10 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(4)
+
+2024-11-19 08:51:10 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(5)
+
+2024-11-19 08:51:10 INFO rust_pixel::render::adapter::sdl Window & gl init ok...
+
+2024-11-19 08:51:10 INFO rust_pixel::render::panel panel init size...Rect { x: 0, y: 0, width: 82, height: 40 }
+
+2024-11-19 08:51:10 INFO rust_pixel::asset asset load:"/Users/shengyifei/projects/makepad/makepad/examples/simple/assets/back.txt"
+
+2024-11-19 08:52:12 INFO rust_pixel::game Simple Game(rust_pixel) start..."/Users/shengyifei/projects/makepad/makepad/examples/simple"
+
+2024-11-19 08:52:12 INFO rust_pixel::game Init game...
+
+2024-11-19 08:52:12 INFO rust_pixel::render::adapter::sdl gl_pixel load texture.../Users/shengyifei/projects/makepad/makepad/examples/simple/assets/pix/c64.png
+
+2024-11-19 08:52:12 INFO rust_pixel::render::adapter::sdl symbol_w=8 symbol_h=8
+
+2024-11-19 08:52:12 INFO rust_pixel::render::adapter::sdl pixel_w=1344 pixel_h=672
+
+2024-11-19 08:52:12 INFO rust_pixel::render::adapter::gl::render_symbols symbols len...16384, texh=1024 texw=1024 th=128 tw=128
+
+2024-11-19 08:52:12 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(2)
+
+2024-11-19 08:52:12 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(3)
+
+2024-11-19 08:52:12 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(4)
+
+2024-11-19 08:52:12 INFO rust_pixel::render::adapter::gl::pixel rt...NativeTexture(5)
+
+2024-11-19 08:52:12 INFO rust_pixel::render::adapter::sdl Window & gl init ok...
+
+2024-11-19 08:52:12 INFO rust_pixel::render::panel panel init size...Rect { x: 0, y: 0, width: 82, height: 40 }
+
+2024-11-19 08:52:12 INFO rust_pixel::asset asset load:"/Users/shengyifei/projects/makepad/makepad/examples/simple/assets/back.txt"
+

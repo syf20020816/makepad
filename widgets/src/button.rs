@@ -1,4 +1,4 @@
-use crate::{makepad_derive_widget::*, makepad_draw::*, widget::*,};
+use crate::{makepad_derive_widget::*, makepad_draw::*, widget::*};
 live_design! {
     ButtonBase = {{Button}} {}
 }
@@ -71,14 +71,14 @@ impl Widget for Button {
         if self.animator_handle_event(cx, event).must_redraw() {
             self.draw_bg.redraw(cx);
         }
-        
-        match event.hit_designer(cx, self.draw_bg.area()){
-            HitDesigner::DesignerPick(_e)=>{
+
+        match event.hit_designer(cx, self.draw_bg.area()) {
+            HitDesigner::DesignerPick(_e) => {
                 cx.widget_action(uid, &scope.path, WidgetDesignAction::PickedBody)
             }
-            _=>()
+            _ => (),
         }
-        
+
         if self.visible {
             // The button only handles hits when it's visible and enabled.
             // If it's not enabled, we still show the button, but we set
@@ -146,15 +146,14 @@ impl Widget for Button {
 }
 
 impl Button {
-        
-    pub fn draw_button(&mut self, cx: &mut Cx2d, label:&str) {
+    pub fn draw_button(&mut self, cx: &mut Cx2d, label: &str) {
         self.draw_bg.begin(cx, self.walk, self.layout);
         self.draw_icon.draw_walk(cx, self.icon_walk);
         self.draw_text
             .draw_walk(cx, self.label_walk, Align::default(), label);
         self.draw_bg.end(cx);
     }
-    
+
     /// Returns `true` if this button was clicked.
     ///
     /// See [`ButtonAction`] for more details.
@@ -203,7 +202,8 @@ impl Button {
     ///
     /// See [`ButtonAction`] for more details.
     pub fn released_modifiers(&self, actions: &Actions) -> Option<KeyModifiers> {
-        if let ButtonAction::Released(m) = actions.find_widget_action(self.widget_uid()).cast_ref() {
+        if let ButtonAction::Released(m) = actions.find_widget_action(self.widget_uid()).cast_ref()
+        {
             Some(*m)
         } else {
             None
@@ -229,17 +229,20 @@ impl ButtonRef {
 
     /// See [`Button::clicked_modifiers()`].
     pub fn clicked_modifiers(&self, actions: &Actions) -> Option<KeyModifiers> {
-        self.borrow().and_then(|inner| inner.clicked_modifiers(actions))
+        self.borrow()
+            .and_then(|inner| inner.clicked_modifiers(actions))
     }
 
     /// See [`Button::pressed_modifiers()`].
-    pub fn pressed_modifiers(&self, actions: &Actions) ->  Option<KeyModifiers> {
-        self.borrow().and_then(|inner| inner.pressed_modifiers(actions))
+    pub fn pressed_modifiers(&self, actions: &Actions) -> Option<KeyModifiers> {
+        self.borrow()
+            .and_then(|inner| inner.pressed_modifiers(actions))
     }
 
     /// See [`Button::released_modifiers()`].
     pub fn released_modifiers(&self, actions: &Actions) -> Option<KeyModifiers> {
-        self.borrow().and_then(|inner| inner.released_modifiers(actions))
+        self.borrow()
+            .and_then(|inner| inner.released_modifiers(actions))
     }
 
     pub fn set_visible(&self, visible: bool) {
@@ -280,11 +283,11 @@ impl ButtonSet {
             item.reset_hover(cx)
         }
     }
-    
-    pub fn which_clicked_modifiers(&self, actions: &Actions) -> Option<(usize,KeyModifiers)> {
-        for (index,btn) in self.iter().enumerate(){
-            if let Some(km) = btn.clicked_modifiers(actions){
-                return Some((index, km))
+
+    pub fn which_clicked_modifiers(&self, actions: &Actions) -> Option<(usize, KeyModifiers)> {
+        for (index, btn) in self.iter().enumerate() {
+            if let Some(km) = btn.clicked_modifiers(actions) {
+                return Some((index, km));
             }
         }
         None
