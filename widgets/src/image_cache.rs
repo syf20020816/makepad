@@ -9,7 +9,7 @@ use std::fs::File;
 pub use makepad_zune_png::error::PngDecodeErrors;
 pub use zune_jpeg::errors::DecodeErrors as JpgDecodeErrors;
 
-#[derive(Live, LiveHook)]
+#[derive(Live, LiveHook, Clone, Copy)]
 #[live_ignore]
 pub enum ImageFit{
     #[pick] Stretch,
@@ -18,6 +18,12 @@ pub enum ImageFit{
     Smallest,
     Biggest,
     Size
+}
+
+impl Default for ImageFit {
+    fn default() -> Self {
+        ImageFit::Stretch
+    }
 }
 
 
