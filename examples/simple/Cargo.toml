@@ -9,4 +9,5 @@ metadata.makepad-auto-version = "db3R5Gxh5Njhx8E-8kuZ2plQ1AI="
 
 [dependencies]
 makepad-widgets = { path = "../../widgets", version = "0.6.0" }
-
+# gen_components = { git = "https://github.com/Privoce/GenUI-Builtin-Component.git", tag = "v0.2.0" }
+gen_components = { path = "/Users/shengyifei/projects/gen_ui/components" }
