@@ -160,12 +160,18 @@ pub struct TextStyle {
     #[live] pub is_secret: bool
 }
 
-#[derive(Clone, Live, LiveHook, PartialEq)]
+#[derive(Clone, Live, LiveHook, PartialEq, Copy)]
 #[live_ignore]
 pub enum TextWrap {
     #[pick] Ellipsis,
     Word,
     Line
+}
+
+impl Default for TextWrap {
+    fn default() -> Self {
+        TextWrap::Ellipsis
+    }
 }
 
 #[derive(Live, LiveRegister)]
