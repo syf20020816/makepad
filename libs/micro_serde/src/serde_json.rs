@@ -1,6 +1,7 @@
 use std::collections::{HashMap};
 use std::hash::Hash;
 use std::str::Chars;
+use makepad_live_id::LiveId;
 
 pub struct SerJsonState {
     pub out: String
@@ -554,6 +555,19 @@ impl_ser_de_json_signed!(i8, std::i64::MIN, std::i8::MAX);
 impl_ser_de_json_float!(f64);
 impl_ser_de_json_float!(f32);
 
+impl SerJson for LiveId {
+    fn ser_json(&self, d: usize, s: &mut SerJsonState) {
+        self.0.ser_json(d, s);
+    }
+}
+
+impl DeJson for LiveId {
+    fn de_json(s: &mut DeJsonState, i: &mut Chars) -> Result<Self,
+    DeJsonErr> {
+        Ok(LiveId(u64::de_json(s, i)?))
+    }
+}
+
 impl<T> SerJson for Option<T> where T: SerJson {
     fn ser_json(&self, d: usize, s: &mut SerJsonState) {
         if let Some(v) = self {
@@ -685,6 +699,24 @@ impl JsonValue{
             return obj.get(key)
         }
         None
+    }
+}
+
+impl SerJson for JsonValue{
+    fn ser_json(&self, d: usize, s: &mut SerJsonState) {
+        match self{
+            JsonValue::String(v)=>v.ser_json(d,s),
+            JsonValue::Char(v)=>v.to_string().ser_json(d, s),
+            JsonValue::U64(v)=>v.ser_json(d, s),
+            JsonValue::I64(v)=>v.ser_json(d, s),
+            JsonValue::F64(v)=>v.ser_json(d, s),
+            JsonValue::Bool(v)=>v.ser_json(d, s),
+            JsonValue::BareIdent(v)=>v.ser_json(d, s),
+            JsonValue::Null=>s.out.push_str("null"),
+            JsonValue::Undefined=>s.out.push_str("undefined"),
+            JsonValue::Object(v)=>v.ser_json(d, s),
+            JsonValue::Array(v)=>v.ser_json(d, s)
+        }
     }
 }
 

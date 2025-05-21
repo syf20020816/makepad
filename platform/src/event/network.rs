@@ -13,16 +13,32 @@ pub struct NetworkResponseItem{
 pub type NetworkResponsesEvent = Vec<NetworkResponseItem>;
 
 #[derive(Clone, Debug)]
-pub enum NetworkResponse{
-    HttpRequestError(String),
-    HttpResponse(HttpResponse),
-    HttpProgress{loaded:u64, total:u64},
+pub struct HttpError{
+    pub message: String,
+    pub metadata_id: LiveId
 }
 
+
+#[derive(Clone, Debug)]
+pub struct HttpProgress{
+    pub loaded:u64, 
+    pub total:u64,
+}
+
+#[derive(Clone, Debug)]
+pub enum NetworkResponse{
+    HttpRequestError(HttpError),
+    HttpResponse(HttpResponse),
+    HttpStreamResponse(HttpResponse),
+    HttpStreamComplete(HttpResponse),
+    HttpProgress(HttpProgress),
+}
+/*
 pub struct NetworkResponseIter<I> {
     iter: Option<I>,
 }
-
+*/
+/*
 impl<I> Iterator for NetworkResponseIter<I> where I: Iterator {
     type Item = I::Item;
     
@@ -32,7 +48,7 @@ impl<I> Iterator for NetworkResponseIter<I> where I: Iterator {
             Some(v)=>v.next()
         }
     }
-}
+}*/
 
 pub struct NetworkResponseChannel {
     pub receiver: Receiver<NetworkResponseItem>,
@@ -57,6 +73,7 @@ pub struct HttpRequest {
     pub method: HttpMethod,
     pub headers: BTreeMap<String, Vec<String>>,
     pub ignore_ssl_cert: bool,
+    pub is_streaming: bool,
     pub body: Option<Vec<u8>>,
 }
 
@@ -75,6 +92,7 @@ impl HttpRequest {
             metadata_id: LiveId(0),
             url,
             method,
+            is_streaming: false,
             ignore_ssl_cert: false,
             headers: BTreeMap::new(),
             body: None
@@ -107,6 +125,10 @@ impl HttpRequest {
     
     pub fn set_ignore_ssl_cert(&mut self){
         self.ignore_ssl_cert = true
+    }
+    
+    pub fn set_is_streaming(&mut self){
+        self.is_streaming = true
     }
     
     pub fn set_metadata_id(&mut self, id: LiveId){

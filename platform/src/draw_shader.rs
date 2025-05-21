@@ -112,6 +112,12 @@ pub struct DrawShader {
     pub draw_shader_ptr: DrawShaderPtr
 }
 
+impl DrawShader{
+    pub fn false_compare_id(&self)->u64{
+        ((self.draw_shader_id as u64)<<32) | self.draw_shader_ptr.0.index as u64
+    }
+}
+
 pub struct CxDrawShader {
     pub class_prop: LiveId,
     pub type_name: LiveId,
@@ -282,6 +288,7 @@ pub struct CxDrawShaderMapping {
     pub view_uniforms: DrawShaderInputs,
     pub pass_uniforms: DrawShaderInputs,
     pub textures: Vec<DrawShaderTextureInput>,
+    pub uses_time: bool,
     pub instance_enums: Vec<usize>,
     pub rect_pos: Option<usize>,
     pub rect_size: Option<usize>,
@@ -307,7 +314,6 @@ impl CxDrawShaderMapping {
         let mut rect_pos = None;
         let mut rect_size = None;
         let mut draw_clip = None;
-        
         for field in &draw_shader_def.fields {
             let ty = field.ty_expr.ty.borrow().as_ref().unwrap().clone();
             match &field.kind {
@@ -381,6 +387,7 @@ impl CxDrawShaderMapping {
         
         CxDrawShaderMapping {
             const_table,
+            uses_time: draw_shader_def.uses_time.get(),
             flags: draw_shader_def.flags,
             geometries,
             instances,

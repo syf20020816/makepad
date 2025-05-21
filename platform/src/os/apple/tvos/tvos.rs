@@ -18,7 +18,7 @@ use {
                     tvos_event::TvosEvent,
                     tvos_app::{TvosApp, init_tvos_app_global,get_tvos_app_global}
                 },
-                url_session::{make_http_request},
+                url_session::{AppleHttpRequests},
             },
             apple_classes::init_apple_classes_global,
             apple_media::CxAppleMedia,
@@ -31,7 +31,7 @@ use {
             Event,
             NetworkResponseChannel
         },
-        cx_api::{CxOsApi, CxOsOp},
+        cx_api::{CxOsApi, CxOsOp, OpenUrlInPlace},
         cx::{Cx, OsType},
     }
 };
@@ -94,36 +94,12 @@ impl Cx {
 
     pub(crate) fn handle_networking_events(&mut self) {
         let mut out = Vec::new();
-        while let Ok(event) = self.os.network_response.receiver.try_recv(){
-            out.push(event);
+        while let Ok(item) = self.os.network_response.receiver.try_recv(){
+            self.os.http_requests.handle_response_item(&item);
+            out.push(item);
         }
         if out.len()>0{
             self.call_event_handler(&Event::NetworkResponses(out))
-        }
-    }
-    
-    #[allow(dead_code)]
-    pub (crate) fn tvos_load_dependencies(&mut self){
-        
-        let bundle_path = unsafe{
-            let main:ObjcId = msg_send![class!(NSBundle), mainBundle];
-            let path:ObjcId = msg_send![main, resourcePath];
-            nsstring_to_string(path)
-        };
-        
-        for (path,dep) in &mut self.dependencies{
-            if let Ok(mut file_handle) = File::open(format!("{}/{}",bundle_path,path)) {
-                let mut buffer = Vec::<u8>::new();
-                if file_handle.read_to_end(&mut buffer).is_ok() {
-                    dep.data = Some(Ok(Rc::new(buffer)));
-                }
-                else{
-                    dep.data = Some(Err("read_to_end failed".to_string()));
-                }
-            }
-            else{
-                dep.data = Some(Err("File open failed".to_string()));
-            }
         }
     }
     
@@ -145,6 +121,7 @@ impl Cx {
                         self.handle_media_signals();
                         self.call_event_handler(&Event::Signal);
                     }
+                    self.handle_action_receiver();
                     if self.handle_live_edit(){
                         // self.draw_shaders.ptr_to_item.clear();
                         // self.draw_shaders.fingerprints.clear();
@@ -161,7 +138,7 @@ impl Cx {
         match event {
            TvosEvent::Init=>{
                 get_tvos_app_global().start_timer(0, 0.008, true);
-                self.start_studio_websocket_tvos();
+                self.start_studio_websocket_delayed();
                 self.call_event_handler(&Event::Startup);
                 self.redraw_all();
             }
@@ -253,8 +230,11 @@ impl Cx {
                 }
                 CxOsOp::UpdateMacosMenu(_menu) => {
                 },
-                CxOsOp::HttpRequest{request_id, request} => {
-                    make_http_request(request_id, request, self.os.network_response.sender.clone());
+                CxOsOp::HttpRequest {request_id, request} => {
+                    self.os.http_requests.make_http_request(request_id, request, self.os.network_response.sender.clone());
+                },
+                CxOsOp::CancelHttpRequest {request_id} => {
+                    self.os.http_requests.cancel_http_request(request_id);
                 },
                 CxOsOp::ShowClipboardActions(_request) => {
                     crate::log!("Show clipboard actions not supported yet");
@@ -297,12 +277,11 @@ impl CxOsApi for Cx {
         self.start_disk_live_file_watcher(50);
         
         self.live_scan_dependencies();
-        //#[cfg(target_feature="sim")]
-        #[cfg(apple_sim)]
+
+        #[cfg(apple_bundle)]
+        self.apple_bundle_load_dependencies();
+        #[cfg(not(apple_bundle))]
         self.native_load_dependencies();
-        
-        #[cfg(not(apple_sim))]
-        self.tvos_load_dependencies();
     }
     
     fn spawn_thread<F>(&mut self, f: F) where F: FnOnce() + Send + 'static {
@@ -312,6 +291,11 @@ impl CxOsApi for Cx {
     fn seconds_since_app_start(&self)->f64{
         Instant::now().duration_since(self.os.start_time.unwrap()).as_secs_f64()
     }    
+    
+    fn open_url(&mut self, _url:&str, _in_place:OpenUrlInPlace){
+        crate::error!("open_url not implemented on this platform");
+    }
+    
     /*
     fn web_socket_open(&mut self, _url: String, _rec: WebSocketAutoReconnect) -> WebSocket {
         todo!()
@@ -330,5 +314,6 @@ pub struct CxOs {
     pub (crate) bytes_written: usize,
     pub (crate) draw_calls_done: usize,
     pub (crate) network_response: NetworkResponseChannel,
+    pub (crate) http_requests: AppleHttpRequests,
 }
 

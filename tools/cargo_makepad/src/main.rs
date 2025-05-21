@@ -31,6 +31,8 @@ println!("    wasm [options] run <cargo args>              Build and run a wasm 
     println!("       --port=8010                               The port to run the wasm webserver");
     println!("       --lan                                     Bind the webserver to your lan ip");
     println!("       --strip                                   Strip the wasm file of debug symbols");
+    println!("       --brotli                                  Use brotli to compress the wasm file");
+    println!("       --bindgen                                 Enable wasm-bindgen compatibility");
     println!();
     println!("Apple iOS/TVOs Commands:");
     println!();
@@ -41,6 +43,7 @@ println!("    wasm [options] run <cargo args>              Build and run a wasm 
     println!(" in order for makepad to be able to install an ios application on a real device a provisioning");
     println!(" profile is needed. To create one make an empty application in xcode and give it an organisation");
     println!(" name and product name you copy exactly and without spaces/odd characters into --org=x and --app=x");
+    println!("                         --stable use stable compiler");
     println!(" Also run it on the device it at least once, so the profile is created");
     println!("                         --org=organisation_name");
     println!("                         --app=product_name");

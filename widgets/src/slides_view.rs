@@ -18,7 +18,7 @@ pub struct SlidesView {
     #[rust] draw_order: Vec<LiveId>,
     #[rust] next_frame: NextFrame,
     #[rust] current_slide: f64,
-    #[live] goal_slide: f64,
+    #[rust] goal_slide: f64,
     #[live] anim_speed: f64,
     #[rust] draw_state: DrawStateWrap<DrawState>,
 }
@@ -27,15 +27,25 @@ impl WidgetNode for SlidesView{
     fn walk(&mut self, _cx:&mut Cx) -> Walk{
         self.walk
     }
-            
+    
+    fn area(&self)->Area{self.area}
+    
     fn redraw(&mut self, cx: &mut Cx){
         self.area.redraw(cx)
     }
     
-    fn find_widgets(&mut self, path: &[LiveId], cached: WidgetCache, results: &mut WidgetSet) {
-        for child in self.children.values_mut() {
+    fn find_widgets(&self, path: &[LiveId], cached: WidgetCache, results: &mut WidgetSet) {
+        for child in self.children.values() {
             child.find_widgets(path, cached, results);
         }
+    }
+    
+    fn uid_to_widget(&self, uid:WidgetUid)->WidgetRef{
+        for child in self.children.values() {
+            let x = child.uid_to_widget(uid);
+            if !x.is_empty(){return x}
+        }
+        WidgetRef::empty()
     }
 }   
 
@@ -89,8 +99,9 @@ impl LiveHook for SlidesView {
     
 }
 
-#[derive(Clone, DefaultNone)]
+#[derive(Clone, Debug, DefaultNone)]
 pub enum SlidesViewAction {
+    Flipped(usize),
     None,
 }
 
@@ -135,9 +146,14 @@ impl Widget for SlidesView {
         match event.hits(cx, self.area) {
             Hit::KeyDown(KeyEvent {key_code: KeyCode::ArrowRight, ..}) => {
                 self.next_slide(cx);
+                let uid = self.widget_uid();
+                cx.widget_action(uid, &scope.path, SlidesViewAction::Flipped(self.goal_slide as usize));
+                
             }
             Hit::KeyDown(KeyEvent {key_code: KeyCode::ArrowLeft, ..}) => {
                 self.prev_slide(cx);
+                let uid = self.widget_uid();
+                cx.widget_action(uid, &scope.path, SlidesViewAction::Flipped(self.goal_slide as usize));
             }
             Hit::FingerDown(_fe) => {
                 cx.set_key_focus(self.area);
@@ -233,6 +249,35 @@ impl SlidesView {
 }
 
 impl SlidesViewRef {
+    pub fn flipped(&self, actions:&Actions)->Option<usize>{
+        if let SlidesViewAction::Flipped(m) = actions.find_widget_action(self.widget_uid()).cast_ref() {
+            Some(*m)
+        } else{
+            None
+        }
+    }                   
+    
+            
+    pub fn set_current_slide(&self, cx:&mut Cx, slide:usize){
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.goal_slide = slide as f64;
+            inner.current_slide = slide as f64;
+            inner.redraw(cx);
+        }
+    }
+        
+    pub fn set_goal_slide(&self, cx:&mut Cx, slide:usize){
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.goal_slide = slide as f64;
+            inner.next_frame(cx);
+        }
+    }
+    pub fn get_slide(&self)->usize{
+        if let Some(inner) = self.borrow() {
+            return inner.current_slide as usize
+        }
+        0
+    }
     pub fn next_slide(&self, cx: &mut Cx) {
         if let Some(mut inner) = self.borrow_mut() {
             inner.next_slide(cx);

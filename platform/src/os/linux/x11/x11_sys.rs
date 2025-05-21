@@ -298,14 +298,14 @@ extern "C" {
     pub fn XFree(arg1: *mut c_void) -> c_int;
     
     pub fn XChangeProperty(
-        arg1: *mut Display,
-        arg2: Window,
-        arg3: Atom,
-        arg4: Atom,
-        arg5: c_int,
-        arg6: c_int,
-        arg7: *const c_uchar,
-        arg8: c_int,
+        display: *mut Display,
+        window: Window,
+        property: Atom,
+        type_: Atom,
+        format: c_int,
+        mode: c_int,
+        data: *const c_uchar,
+        num_elements: c_int,
     ) -> c_int;
     
     pub fn XSendEvent(
@@ -357,6 +357,13 @@ extern "C" {
     ) -> c_int;
     
     pub fn XMapWindow(arg1: *mut Display, arg2: Window) -> c_int;
+
+    pub fn XMoveWindow(
+        display: *mut Display,
+        window: Window,
+        x: c_int,
+        y: c_int,
+    );
     
     pub fn XFlush(arg1: *mut Display) -> c_int;
     

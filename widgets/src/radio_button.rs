@@ -66,7 +66,7 @@ pub struct RadioButton {
     
     #[live] label_walk: Walk,
     #[live] label_align: Align,
-    #[live] text: RcStringMut,
+    #[live] text: ArcStringMut,
     
     #[live] bind: String,
 }
@@ -187,7 +187,7 @@ impl RadioButtonSet{
                     RadioButtonAction::Clicked => if let Some(index) = self.0.iter().position(|v| action.widget_uid == v.widget_uid()){
                         for (i, item) in self.0.iter().enumerate(){
                             if i != index{
-                                RadioButtonRef(item).unselect(cx);
+                                RadioButtonRef(item.clone()).unselect(cx);
                             }
                         }
                         return Some(index);

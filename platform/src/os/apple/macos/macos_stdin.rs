@@ -19,7 +19,6 @@ use {
         texture::{Texture, TextureFormat},
         thread::SignalToUI,
         os::{
-            url_session::{make_http_request},
             apple_sys::*,
             metal_xpc::{
                 xpc_service_proxy,
@@ -64,6 +63,7 @@ impl Cx {
         stdin_windows: &mut [StdinWindow],
         time: f32,
     ) {
+        //self.demo_time_repaint = false;
         let mut passes_todo = Vec::new();
         self.compute_pass_repaint_order(&mut passes_todo);
         self.repaint_id += 1;
@@ -254,6 +254,7 @@ impl Cx {
                                         id: presentable_image.id,
                                         width: swapchain.alloc_width as usize,
                                         height: swapchain.alloc_height as usize,
+                                        initial: true,
                                     };
                                     let texture = Texture::new_with_format(self, format);
                                     if self.textures[texture.texture_id()].update_from_shared_handle(
@@ -271,7 +272,8 @@ impl Cx {
                         self.handle_media_signals();
                         self.call_event_handler(&Event::Signal);
                     }
-                    for event in self.os.stdin_timers.get_dispatch() {
+                    let events = self.os.stdin_timers.get_dispatch();
+                    for event in  events{
                         self.call_event_handler(&event);
                     }                    
                     if self.handle_live_edit() {
@@ -412,7 +414,10 @@ impl Cx {
                     self.os.stdin_timers.timers.remove(&timer_id);
                 },
                 CxOsOp::HttpRequest {request_id, request} => {
-                    make_http_request(request_id, request, self.os.network_response.sender.clone());
+                    self.os.http_requests.make_http_request(request_id, request, self.os.network_response.sender.clone());
+                },
+                CxOsOp::CancelHttpRequest {request_id} => {
+                    self.os.http_requests.cancel_http_request(request_id);
                 },
                 _ => ()
                 /*

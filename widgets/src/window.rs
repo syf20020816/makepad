@@ -60,7 +60,8 @@ impl LiveHook for Window {
         self.window.set_pass(cx, &self.pass);
         //self.pass.set_window_clear_color(cx, vec4(0.0,0.0,0.0,0.0));
         self.depth_texture = Texture::new_with_format(cx, TextureFormat::DepthD32{
-            size:TextureSize::Auto
+            size:TextureSize::Auto,
+            initial: true,
         });
         self.pass.set_depth_texture(cx, &self.depth_texture, PassClearDepth::ClearWith(1.0));
         // check if we are ar/vr capable
@@ -171,13 +172,24 @@ impl Window {
         }
 
         if self.show_performance_view {
-            self.performance_view.draw(cx, &mut Scope::empty()).unwrap();
+            self.performance_view.draw_all(cx, &mut Scope::empty());
         }
 
         cx.end_pass_sized_turtle();
         
         self.main_draw_list.end(cx);
         cx.end_pass(&self.pass);
+    }
+}
+
+impl WindowRef{
+    pub fn get_inner_size(&self, cx:&Cx)->DVec2{
+        if let Some(inner) = self.borrow(){
+            inner.window.get_inner_size(cx)
+        }
+        else{
+            dvec2(0.0,0.0)
+        }
     }
 }
 

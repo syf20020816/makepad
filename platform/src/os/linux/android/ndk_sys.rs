@@ -1,3 +1,7 @@
+#![allow(non_camel_case_types)]
+#![allow(non_snake_case)]
+
+use std::ffi::c_void;
 use makepad_jni_sys as jni_sys;
 
 #[repr(C)]
@@ -41,4 +45,43 @@ extern "C" {
         env: *mut jni_sys::JNIEnv,
         assetManager: jni_sys::jobject,
     ) -> *mut AAssetManager;
+    
+    pub fn  ANativeWindow_setFrameRate(
+         window: *mut ANativeWindow,
+         frameRate:f32,
+         compatibility:i8
+    )->i32;
+}
+
+pub type AChoreographer = c_void;
+pub type AChoreographerFrameCallbackData = c_void;
+
+pub type AChoreographer_vsyncCallback = unsafe extern "C" fn(
+    callbackData: *mut AChoreographerFrameCallbackData,
+    data: *mut c_void,
+);
+
+/// The function type for posting callbacks to the AChoreographer
+pub type AChoreographerPostCallbackFn = unsafe extern "C" fn(
+    *mut AChoreographer,
+    Option<unsafe extern "C" fn(*mut AChoreographerFrameCallbackData, *mut std::ffi::c_void)>,
+    *mut std::ffi::c_void,
+) -> i32;
+
+#[cfg(not(no_android_choreographer))]
+extern "C" {
+    pub fn AChoreographer_getInstance() -> *mut AChoreographer;
+    // Android SDK >= 33
+    pub fn AChoreographer_postVsyncCallback(
+        choreographer: *mut AChoreographer,
+        callback: Option<AChoreographer_vsyncCallback>,
+        data: *mut c_void,
+    ) -> i32;
+
+    // Android SDK < 33 && >= 29
+    pub fn AChoreographer_postFrameCallback64(
+        choreographer: *mut AChoreographer,
+        callback: Option<AChoreographer_vsyncCallback>,
+        data: *mut c_void,
+    ) -> i32;
 }

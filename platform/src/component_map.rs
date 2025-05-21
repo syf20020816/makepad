@@ -7,7 +7,7 @@ use {
     crate::cx::Cx
 };
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct ComponentMap<K,V>{
     map: HashMap<K,V>,
     visible: HashSet<K>
@@ -44,6 +44,11 @@ impl<K: std::cmp::Eq + std::hash::Hash + Copy,V> ComponentMap<K,V>{
             Entry::Occupied(o) => o.into_mut(),
             Entry::Vacant(v) => v.insert(cb(cx))
         }
+    }
+
+    pub fn entry(&mut self, key: K) -> Entry<K, V> {
+        self.visible.insert(key);
+        self.map.entry(key)
     }
 }
  

@@ -2,18 +2,22 @@ use {
     std::collections::{HashMap, hash_map},
     std::path::Path,
     crate::{
-        makepad_code_editor::{Document, decoration::{Decoration, DecorationSet}, Session},
+        makepad_code_editor::{CodeDocument, decoration::{Decoration, DecorationSet}, CodeSession},
         makepad_platform::makepad_live_compiler::LiveFileChange,
         makepad_widgets::*,
         makepad_widgets::file_tree::*,
         file_system::FileClient,
+        ai_chat::ai_chat_manager::AiChatDocument,
         makepad_file_protocol::{
             FileRequest,
             FileError,
             FileResponse,
             FileClientMessage,
+            FileNotification,
             FileNodeData,
             FileTreeData,
+            SaveKind,
+            SaveFileResponse
         },
     },
 };
@@ -25,13 +29,20 @@ pub struct FileSystem {
     pub file_nodes: LiveIdMap<LiveId, FileNode>,
     pub path_to_file_node_id: HashMap<String, LiveId>,
     pub tab_id_to_file_node_id: HashMap<LiveId, LiveId>,
-    pub tab_id_to_session: HashMap<LiveId, Session>,
-    pub open_documents: HashMap<LiveId, OpenDoc>
+    pub tab_id_to_session: HashMap<LiveId, EditSession>,
+    pub open_documents: HashMap<LiveId, OpenDocument>
 }
 
-pub enum OpenDoc {
-    Decorations(DecorationSet),
-    Document(Document)
+pub enum EditSession {
+    Code(CodeSession),
+    AiChat(LiveId)
+}
+
+pub enum OpenDocument {
+    CodeLoading(DecorationSet),
+    Code(CodeDocument),
+    AiChatLoading,
+    AiChat(AiChatDocument)
 }
 
 
@@ -59,10 +70,43 @@ pub enum FileSystemAction {
     TreeLoaded,
     RecompileNeeded,
     LiveReloadNeeded(LiveFileChange),
+    FileChangedOnDisk(SaveFileResponse),
     None
 }
 
 impl FileSystem {
+    pub fn get_editor_template_from_path(path:&str)->LiveId{
+        let p = Path::new(path);
+        match p.extension()
+        .and_then(|ext| ext.to_str())
+        .map(|ext_str| ext_str.to_lowercase()) {
+            Some(ext) => match ext.as_str() {
+                "mpai"=>live_id!(AiChat),
+                _=>live_id!(CodeEditor)
+            }
+            _=>{
+                live_id!(CodeEditor)
+            }
+        }
+    }
+    
+    pub fn get_tab_after_from_path(path:&str)->LiveId{
+        match Self::get_editor_template_from_path(path){
+            live_id!(AiChat)=>live_id!(ai_first),
+            _=>live_id!(edit_first),
+        }
+    }
+        
+    
+    pub fn get_editor_template_from_file_id(&self, file_id:LiveId)->Option<LiveId>{
+        if let Some(path) = self.file_node_id_to_path(file_id){
+            Some(Self::get_editor_template_from_path(path))
+        }
+        else{
+            None
+        }
+    }
+    
     pub fn init(&mut self, cx: &mut Cx, path:&Path) {
         self.file_client.init(cx, path);
         self.reload_file_tree();
@@ -81,6 +125,15 @@ impl FileSystem {
         self.path_to_file_node_id.get(path).cloned()
     }
     
+    pub fn file_node_id_to_path(&self, file_id:LiveId) -> Option<&str> {
+        for (path, id) in &self.path_to_file_node_id{
+            if *id == file_id{
+                return Some(path)
+            }
+        }
+        None
+    }
+    
     pub fn file_node_id_to_tab_id(&self, file_node: LiveId) -> Option<LiveId> {
         for (tab, id) in &self.tab_id_to_file_node_id {
             if *id == file_node {
@@ -90,14 +143,27 @@ impl FileSystem {
         None
     }
     
-    pub fn get_session_mut(&mut self, tab_id: LiveId) -> Option<&mut Session> {
+    pub fn get_session_mut(&mut self, tab_id: LiveId) -> Option<&mut EditSession> {
         // lets see if we have a document yet
         if let Some(file_id) = self.tab_id_to_file_node_id.get(&tab_id) {
-            if let Some(OpenDoc::Document(document)) = self.open_documents.get(file_id) {
-                return Some(match self.tab_id_to_session.entry(tab_id) {
-                    hash_map::Entry::Occupied(o) => o.into_mut(),
-                    hash_map::Entry::Vacant(v) => v.insert(Session::new(document.clone()))
-                })
+            match self.open_documents.get(file_id){
+                Some(OpenDocument::Code(document))=>{
+                    return Some(match self.tab_id_to_session.entry(tab_id) {
+                        hash_map::Entry::Occupied(o) => o.into_mut(),
+                        hash_map::Entry::Vacant(v) => {
+                            v.insert(EditSession::Code(CodeSession::new(document.clone())))            
+                        }
+                    })
+                }
+                Some(OpenDocument::AiChat(_document))=>{
+                    return Some(match self.tab_id_to_session.entry(tab_id) {
+                        hash_map::Entry::Occupied(o) => o.into_mut(),
+                        hash_map::Entry::Vacant(v) => {
+                            v.insert(EditSession::AiChat(*file_id))
+                        }
+                    })
+                }
+                Some(_)| None=>()
             }
         }
         None
@@ -116,19 +182,30 @@ impl FileSystem {
                         }
                         FileResponse::OpenFile(result) => {
                             match result {
-                                Ok((_unix_path, data, id)) => {
-                                    let file_id = LiveId(id);
+                                Ok(response) => {
+                                    let file_id = LiveId(response.id);
                                     let dock = ui.dock(id!(dock));
                                     for (tab_id, file_id) in &self.tab_id_to_file_node_id {
-                                        if id == file_id.0 {
+                                        if response.id == file_id.0 {
                                             dock.redraw_tab(cx, *tab_id);
                                         }
                                     }
-                                    if let Some(OpenDoc::Decorations(dec)) = self.open_documents.get(&file_id) {
-                                        let dec = dec.clone();
-                                        self.open_documents.insert(file_id, OpenDoc::Document(Document::new(data.into(), dec)));
-                                    }else {panic!()}
-                                    ui.redraw(cx);
+                                    match self.open_documents.get(&file_id){
+                                        Some(OpenDocument::CodeLoading(dec))=>{
+                                            let dec = dec.clone();
+                                            self.open_documents.insert(file_id, OpenDocument::Code(CodeDocument::new(response.data.into(), dec)));
+                                        }
+                                        Some(OpenDocument::Code(_))=>{
+                                        }
+                                        Some(OpenDocument::AiChatLoading)=>{
+                                             self.open_documents.insert(file_id, OpenDocument::AiChat(AiChatDocument::load_or_empty(&response.data)));
+                                        }
+                                        Some(OpenDocument::AiChat(_))=>{
+                                        }
+                                        _=>panic!()
+                                    }
+                                    
+                                    dock.redraw(cx);
                                 }
                                 Err(FileError::CannotOpen(_unix_path)) => {
                                 }
@@ -139,36 +216,8 @@ impl FileSystem {
                             }
                         }
                         FileResponse::SaveFile(result) => match result {
-                            Ok((path, old, new, _id, was_patch)) => {
-                                // alright file has been saved
-                                // now we need to check if a live_design!{} changed or something outside it
-                                if old != new && !was_patch {
-                                    let mut old_neg = Vec::new();
-                                    let mut new_neg = Vec::new();
-                                    match LiveRegistry::tokenize_from_str_live_design(&old, Default::default(), Default::default(), Some(&mut old_neg)) {
-                                        Err(e) => {
-                                            log!("Cannot tokenize old file {}", e)
-                                        }
-                                        Ok(old_tokens) => match LiveRegistry::tokenize_from_str_live_design(&new, Default::default(), Default::default(), Some(&mut new_neg)) {
-                                            Err(e) => {
-                                                log!("Cannot tokenize new file {}", e);
-                                            }
-                                            Ok(new_tokens) => {
-                                                // we need the space 'outside' of these tokens
-                                                if old_neg != new_neg {
-                                                    cx.action(FileSystemAction::RecompileNeeded)
-                                                }
-                                                if old_tokens != new_tokens{
-                                                    // design code changed, hotreload it
-                                                    cx.action( FileSystemAction::LiveReloadNeeded(LiveFileChange {
-                                                        file_name: path,
-                                                        content: new
-                                                    }));
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
+                            Ok(response) => {
+                                self.process_save_response(cx, response);
                             }
                             Err(_) => {}
                             // ok we saved a file, we should check however what changed
@@ -176,40 +225,166 @@ impl FileSystem {
                             
                         }
                     },
-                    FileClientMessage::Notification(_notification) => {
+                    FileClientMessage::Notification(notification) => {
+                        match notification{
+                            FileNotification::FileChangedOnDisk(response)=>{
+                               //println!("FILE CHANGED ON DISK {}", response.path);
+                                if let Some(file_id) = self.path_to_file_node_id.get(&response.path){
+                                    
+                                    if let Some(OpenDocument::Code(doc)) = self.open_documents.get_mut(&file_id){
+                                        doc.replace(response.new_data.clone().into());
+                                    }
+                                    ui.redraw(cx);
+                                }
+                                self.process_save_response(cx, response.clone());
+                                // alright now what.
+                                // we should chuck this into the load comparison
+                                cx.action( FileSystemAction::FileChangedOnDisk(response));
+                            }
+                        }
                         //self.editors.handle_collab_notification(cx, &mut state.editor_state, notification)
                     }
                 }
             }
         }
     }
-
+    
+    pub fn replace_live_design(&self, cx:&mut Cx, file_id:LiveId, new_data:&str){
+        let mut old_neg = Vec::new();
+        let mut new_neg = Vec::new();
+        
+        match self.open_documents.get(&file_id){
+            Some(OpenDocument::Code(doc))=>{
+                let old_data = doc.as_text().to_string();
+                match LiveRegistry::tokenize_from_str_live_design(&old_data, Default::default(), Default::default(), Some(&mut old_neg)) {
+                    Err(e) => {
+                        log!("Cannot tokenize old file {}", e)
+                    }
+                    Ok(old_tokens) if old_tokens.len()>2  => match LiveRegistry::tokenize_from_str_live_design(new_data, Default::default(), Default::default(), Some(&mut new_neg)) {
+                        Err(e) => {
+                            log!("Cannot tokenize new file {}", e);
+                        }
+                        Ok(new_tokens) if new_tokens.len()>2 => {
+                            let old_start = old_tokens[0].span.start.to_byte_offset(&old_data);
+                            let old_end = old_tokens.iter().rev().nth(1).unwrap().span.end.to_byte_offset(&old_data);
+                            let new_start = new_tokens[0].span.start.to_byte_offset(&new_data);
+                            let new_end = new_tokens.iter().rev().nth(1).unwrap().span.end.to_byte_offset(&new_data);
+                            if old_start.is_none() || old_end.is_none() || new_start.is_none() || new_end.is_none(){
+                                log!("Cannot find range correctly {:?} {:?} {:?} {:?}", old_start, old_end, new_start, new_end);
+                            }
+                            else{
+                                let mut combined_data = old_data.to_string();
+                                combined_data.replace_range(old_start.unwrap()..old_end.unwrap(), &new_data[new_start.unwrap()..new_end.unwrap()]);
+                                cx.action( FileSystemAction::LiveReloadNeeded(LiveFileChange {
+                                    file_name: self.file_node_id_to_path(file_id).unwrap().to_string(),
+                                    content: combined_data.to_string(),
+                                }));
+                                doc.replace(combined_data.into());
+                            }
+                        }
+                        _ => {
+                            log!("Cannot tokenize new file");
+                        }
+                    }
+                    _ => {
+                        log!("Cannot tokenize new file");
+                    }
+                }
+            }
+            _=>()
+        }
+                
+    }
+    
+    
+    pub fn process_possible_live_reload(&mut self, cx:&mut Cx, path:&str, old_data:&str, new_data:&str, recompile:bool){
+        let mut old_neg = Vec::new();
+        let mut new_neg = Vec::new();
+        match LiveRegistry::tokenize_from_str_live_design(old_data, Default::default(), Default::default(), Some(&mut old_neg)) {
+            Err(e) => {
+                log!("Cannot tokenize old file {}", e)
+            }
+            Ok(old_tokens) => match LiveRegistry::tokenize_from_str_live_design(new_data, Default::default(), Default::default(), Some(&mut new_neg)) {
+                Err(e) => {
+                    log!("Cannot tokenize new file {}", e);
+                }
+                Ok(new_tokens) => {
+                    // we need the space 'outside' of these tokens
+                    if recompile && old_neg != new_neg {
+                        cx.action(FileSystemAction::RecompileNeeded)
+                    }
+                    if old_tokens != new_tokens{
+                        // design code changed, hotreload it
+                        cx.action( FileSystemAction::LiveReloadNeeded(LiveFileChange {
+                            file_name: path.to_string(),
+                            content: new_data.to_string(),
+                        }));
+                    }
+                }
+            }
+        }
+    }
+    
+    
+    pub fn process_save_response(&mut self, cx:&mut Cx, response:SaveFileResponse){
+        // alright file has been saved
+        // now we need to check if a live_design!{} changed or something outside it
+        if Self::get_editor_template_from_path(&response.path) != live_id!(CodeEditor){
+            return
+        }
+        
+        if response.old_data != response.new_data && response.kind != SaveKind::Patch {
+            self.process_possible_live_reload(cx, &response.path, &response.old_data, &response.new_data, true);
+        }
+    }
+    
     pub fn handle_sessions(&mut self) {
         for session in self.tab_id_to_session.values_mut() {
-            session.handle_changes();
+            match session{
+                EditSession::Code(session)=>{
+                    session.handle_changes();
+                }
+                EditSession::AiChat(_id)=>{
+                }
+            }
         }
     }
     
     pub fn request_open_file(&mut self, tab_id: LiveId, file_id: LiveId) {
         // ok lets see if we have a document
         // ifnot, we create a new one
-        self.tab_id_to_file_node_id.insert(tab_id, file_id);
-        // move decorations to doc
+        if tab_id != LiveId(0){
+            self.tab_id_to_file_node_id.insert(tab_id, file_id);
+        }
+            
+        // fetch decoration set
         let dec = match self.open_documents.get(&file_id){
-            Some(OpenDoc::Decorations(_))=> if let Some(OpenDoc::Decorations(dec)) = self.open_documents.remove(&file_id){
+            Some(OpenDocument::CodeLoading(_))=> if let Some(OpenDocument::CodeLoading(dec)) = self.open_documents.remove(&file_id){
                 dec
             }
             else{
                 panic!()
             },
-            Some(OpenDoc::Document(_))=>{
+            Some(OpenDocument::Code(_))=>{
                 return
             }
-            None=>DecorationSet::new()
+            Some(_) | None=>DecorationSet::new()
         };
-        self.open_documents.insert(file_id, OpenDoc::Decorations(dec));
+        
+        let template = self.get_editor_template_from_file_id(file_id).unwrap();
+        
+        match template{
+            live_id!(CodeEditor)=>{
+                self.open_documents.insert(file_id, OpenDocument::CodeLoading(dec));
+            }
+            live_id!(AiChat)=>{
+                self.open_documents.insert(file_id, OpenDocument::AiChatLoading);
+            }
+            _=>panic!()
+        }
+        
         let path = self.file_node_path(file_id);
-        self.file_client.send_request(FileRequest::OpenFile(path, file_id.0));
+        self.file_client.send_request(FileRequest::OpenFile{path, id: file_id.0});
     }
     
     pub fn request_save_file_for_tab_id(&mut self, tab_id: LiveId, was_patch:bool) {
@@ -220,11 +395,49 @@ impl FileSystem {
         };
     }
     
-    pub fn request_save_file_for_file_node_id(&mut self, file_id: LiveId, was_patch:bool) {
-        if let Some(OpenDoc::Document(doc)) = self.open_documents.get(&file_id) {
-            let text = doc.as_text().to_string();
+    pub fn replace_code_document(&self, file_id:LiveId, text:&str){
+        match self.open_documents.get(&file_id){
+            Some(OpenDocument::Code(doc))=>{
+                doc.replace(text.into());
+            }
+            _=>()
+        }
+        
+    }
+    
+    pub fn file_path_as_string(&self, path:&str)->Option<String>{
+        if let Some(file_id) = self.path_to_file_node_id(&path){
+            self.file_id_as_string(file_id)
+        }
+        else{
+            None
+        }
+    }
+    
+    pub fn file_id_as_string(&self, file_id: LiveId)->Option<String>{
+        match self.open_documents.get(&file_id){
+            Some(OpenDocument::Code(doc))=>{
+                Some(doc.as_text().to_string())
+            }
+            Some(OpenDocument::CodeLoading(_))=>{
+                None
+            }
+            Some(OpenDocument::AiChat(doc))=>{
+                Some(doc.file.to_string())
+            }
+            _=>None
+        }
+    }
+    
+    pub fn request_save_file_for_file_node_id(&mut self, file_id: LiveId, patch:bool) {
+        if let Some(text) = self.file_id_as_string(file_id){
             let path = self.file_node_path(file_id);
-            self.file_client.send_request(FileRequest::SaveFile(path.clone(), text, file_id.0, was_patch));
+            self.file_client.send_request(FileRequest::SaveFile{
+                path: path.clone(), 
+                data: text, 
+                id: file_id.0,
+                patch
+            });
         }
     }
     
@@ -232,9 +445,9 @@ impl FileSystem {
         // ok lets see if we have a document
         // ifnot, we create a new one
         match self.open_documents.get_mut(file_node_id) {
-            Some(OpenDoc::Decorations(dec)) => dec.clear(),
-            Some(OpenDoc::Document(doc)) => doc.clear_decorations(),
-            None => ()
+            Some(OpenDocument::CodeLoading(dec)) => dec.clear(),
+            Some(OpenDocument::Code(doc)) => doc.clear_decorations(),
+            Some(_) | None=>()
         };
     }
     
@@ -243,8 +456,9 @@ impl FileSystem {
         // ifnot, we create a new one
         for document in self.open_documents.values_mut() {
             match document {
-                OpenDoc::Decorations(dec) => dec.clear(),
-                OpenDoc::Document(doc) => doc.clear_decorations(),
+                OpenDocument::CodeLoading(dec) => dec.clear(),
+                OpenDocument::Code(doc) => doc.clear_decorations(),
+                _=>()
             }
         }
     }
@@ -267,18 +481,18 @@ impl FileSystem {
         // ok lets see if we have a document
         // ifnot, we create a new one
         match self.open_documents.get_mut(&file_id) {
-            Some(OpenDoc::Decorations(decs)) => decs.add_decoration(dec),
-            Some(OpenDoc::Document(doc)) => {
+            Some(OpenDocument::CodeLoading(decs)) => decs.add_decoration(dec),
+            Some(OpenDocument::Code(doc)) => {
                 doc.add_decoration(dec);
             }
+            Some(_) =>{}
             None => {
                 let mut set = DecorationSet::new();
                 set.add_decoration(dec);
-                self.open_documents.insert(file_id, OpenDoc::Decorations(set));
+                self.open_documents.insert(file_id, OpenDocument::CodeLoading(set));
             }
         };
     }
-    
     
     pub fn draw_file_node(&self, cx: &mut Cx2d, file_node_id: LiveId, file_tree: &mut FileTree) {
         if let Some(file_node) = self.file_nodes.get(&file_node_id) {
@@ -314,72 +528,86 @@ impl FileSystem {
         }
         path
     }
-    
     pub fn ensure_unique_tab_names(&self, cx: &mut Cx, dock: &DockRef) {
-        let mut min_diff: HashMap<LiveId, usize> = HashMap::new();
-        let mut outer_path = Vec::new();
-        let mut inner_path = Vec::new();
-        for (_outer_tab_id, outer_file_id) in &self.tab_id_to_file_node_id {
-            let mut outer = &self.file_nodes[*outer_file_id];
-            outer_path.clear();
-            while let Some(edge) = &outer.parent_edge {
-                outer_path.push(&edge.name);
-                outer = &self.file_nodes[edge.file_node_id];
+                
+        fn longest_common_suffix(a: &[&str], b: &[&str]) -> Option<usize> {
+            if a == b{
+                return None // same file
             }
-            if min_diff.get(&outer_file_id).is_none() {
-                min_diff.insert(*outer_file_id, 0);
+            let mut ai = a.len();
+            let mut bi = b.len();
+            let mut count = 0;
+            while ai > 0 && bi > 0 {
+                ai -= 1;
+                bi -= 1;
+                if a[ai] == b[bi] {
+                    count += 1;
+                } else {
+                    break;
+                }
             }
-            for (_inner_tab_id, inner_file_id) in &self.tab_id_to_file_node_id {
-                if inner_file_id == outer_file_id{
-                    continue; 
-                }
-                let mut inner = &self.file_nodes[*inner_file_id];
-                inner_path.clear();
-                while let Some(edge) = &inner.parent_edge {
-                    inner_path.push(&edge.name);
-                    inner = &self.file_nodes[edge.file_node_id];
-                }
-                for i in 0..inner_path.len().min(outer_path.len()) {
-                    if inner_path[i] != outer_path[i] {
-                        // store the min depth at which these ones are different
-                        if let Some(min) = min_diff.get_mut(&inner_file_id) {
-                            *min = (*min).max(i);
-                        }
-                        else {
-                            min_diff.insert(*inner_file_id, i);
-                        }
-                        if let Some(min) = min_diff.get_mut(&outer_file_id) {
-                            *min = (*min).max(i);
-                        }
-                        else {
-                            min_diff.insert(*outer_file_id, i);
-                        }
-                        break;
+            Some(count)
+        }
+        // Collect the path components for each open tab
+        let mut tabs: Vec<(LiveId, Vec<&str>, usize)> = Vec::new();
+        for (&tab_id, &file_id) in &self.tab_id_to_file_node_id {
+            let mut path_components = Vec::new();
+            let mut file_node = &self.file_nodes[file_id];
+            
+            while let Some(edge) = &file_node.parent_edge {
+                // Collect references to the file node names without cloning
+                path_components.push(edge.name.as_str());
+                file_node = &self.file_nodes[edge.file_node_id];
+            }
+            // Reverse the components so they go from root to leaf
+            path_components.reverse();
+            
+            tabs.push((tab_id, path_components, 1));
+        }
+        
+        // Sort the tabs by their path components
+        tabs.sort_by(|a, b| a.1.cmp(&b.1));
+        
+        // Determine the minimal unique suffix for each tab
+        let mut changing = true;
+        while changing{
+            changing = false;
+            for i in 0..tabs.len() {
+                let (_, ref path, minsfx) = tabs[i];
+                let mut min_suffix_len = minsfx;
+                // Compare with previous tab
+                if i > 0 {
+                    let (_, ref prev_path, _) = tabs[i - 1];
+                    if let Some(common)= longest_common_suffix(path, prev_path){
+                        min_suffix_len = min_suffix_len.max(common + 1)
                     }
+                }
+                // Compare with next tab
+                if i + 1 < tabs.len() {
+                    let (_, ref next_path, minsfx) = tabs[i + 1];
+                    if let Some(common) = longest_common_suffix(path, next_path){
+                        min_suffix_len = min_suffix_len.max(common + 1).max(minsfx);
+                    }
+                    else{
+                        min_suffix_len = minsfx;
+                    }
+                }
+                // lets store this one 
+                let (_,_, ref mut minsfx) = tabs[i];
+                if *minsfx != min_suffix_len{
+                    changing = true;
+                    *minsfx = min_suffix_len;
                 }
             }
         }
-        // now loop over the tabs
-        for (tab_id, file_id) in &self.tab_id_to_file_node_id {
-            if let Some(min) = min_diff.get(&file_id) {
-                let mut inner = &self.file_nodes[*file_id];
-                inner_path.clear();
-                while let Some(edge) = &inner.parent_edge {
-                    inner_path.push(&edge.name);
-                    inner = &self.file_nodes[edge.file_node_id];
-                }
-                let mut name = String::new();
-                for i in (0..*min+1).rev() {
-                    if name.len()>0 {
-                        name.push_str("/");
-                    }
-                    name.push_str(inner_path[i]);
-                }
-                dock.set_tab_title(cx, *tab_id, name);
-            }
+        for i in 0..tabs.len() {
+            let (tab_id, ref path, minsfx) = tabs[i];
+            let start = path.len().saturating_sub(minsfx);
+            let title = path[start..].join("/");
+            dock.set_tab_title(cx, tab_id, title);
         }
+        
     }
-    
     
     pub fn load_file_tree(&mut self, tree_data: FileTreeData) {
         fn create_file_node(

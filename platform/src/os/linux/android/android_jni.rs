@@ -1,6 +1,9 @@
 use makepad_jni_sys as jni_sys;
+use crate::module_loader::ModuleLoader;
+
 use {
-    std::{cell::{Cell, RefCell}, ffi::CString, sync::mpsc::{self, Sender}},
+    std::sync::Mutex,
+    std::{cell::Cell, ffi::CString, sync::mpsc::{self, Sender}},
     self::super::{
         ndk_sys,
         ndk_utils,
@@ -38,6 +41,7 @@ pub enum FromJavaMessage {
         window: *mut ndk_sys::ANativeWindow,
     },
     SurfaceDestroyed,
+    RenderLoop,
     Touch(Vec<TouchPoint>),
     Character {
         character: u32,
@@ -68,14 +72,14 @@ pub enum FromJavaMessage {
     },
     WebSocketMessage {
         message: Vec<u8>,
-        sender: Box<Sender<WebSocketMessage>>,
+        sender: Box<(u64,Sender<WebSocketMessage>)>,
     },
     WebSocketClosed {
-        sender: Box<Sender<WebSocketMessage>>,
+        sender: Box<(u64,Sender<WebSocketMessage>)>,
     },
     WebSocketError {
         error: String,
-        sender: Box<Sender<WebSocketMessage>>,
+        sender: Box<(u64,Sender<WebSocketMessage>)>,
     },
     MidiDeviceOpened{
         name: String,
@@ -109,15 +113,12 @@ pub enum FromJavaMessage {
 }
 unsafe impl Send for FromJavaMessage {}
 
-thread_local! {
-    static MESSAGES_TX: RefCell<Option<mpsc::Sender<FromJavaMessage>>> = RefCell::new(None);
-}
+static MESSAGES_TX: Mutex<Option<mpsc::Sender<FromJavaMessage>>> = Mutex::new(None);
 
 fn send_from_java_message(message: FromJavaMessage) {
-    MESSAGES_TX.with(|tx| {
-        let mut tx = tx.borrow_mut();
+    if let Ok(mut tx) = MESSAGES_TX.lock(){
         tx.as_mut().unwrap().send(message).unwrap();
-    })
+    }
 }
 
 // Defined in https://developer.android.com/reference/android/view/KeyEvent#META_CTRL_MASK
@@ -138,7 +139,7 @@ pub unsafe fn jni_init_globals(activity:*const std::ffi::c_void, from_java_tx: m
     let env = attach_jni_env();
     let activity = (**env).NewGlobalRef.unwrap()(env, activity as jni_sys::jobject);
     SET_ACTIVITY_FN(activity);
-    MESSAGES_TX.with(move |messages_tx| *messages_tx.borrow_mut() = Some(from_java_tx));
+    *MESSAGES_TX.lock().unwrap() = Some(from_java_tx);
 }
 
 pub unsafe fn attach_jni_env() -> *mut jni_sys::JNIEnv {
@@ -158,6 +159,95 @@ unsafe fn create_native_window(surface: jni_sys::jobject) -> *mut ndk_sys::ANati
     ndk_sys::ANativeWindow_fromSurface(env, surface)
 }
 
+#[cfg(not(no_android_choreographer))]
+static mut CHOREOGRAPHER: *mut ndk_sys::AChoreographer = std::ptr::null_mut();
+
+#[cfg(not(no_android_choreographer))]
+static mut CHOREOGRAPHER_POST_CALLBACK_FN: Option<unsafe extern "C" fn(*mut ndk_sys::AChoreographer, Option<unsafe extern "C" fn(*mut ndk_sys::AChoreographerFrameCallbackData, *mut std::ffi::c_void)>, *mut std::ffi::c_void) -> i32> = None;
+
+/// Initializes the render loop which used the Android Choreographer when available to ensure proper vsync.
+/// If `no_android_choreographer` is present (e.g. OHOS with non-compatiblity), we fallback to a simple loop with frame pacing.
+/// This will be replaced by proper a vsync mechanism once we firgure it out for that OHOS.
+#[allow(unused)]
+#[no_mangle]
+pub unsafe extern "C" fn Java_dev_makepad_android_MakepadNative_initChoreographer(
+    _: *mut jni_sys::JNIEnv,
+    _: jni_sys::jclass,
+    device_refresh_rate: jni_sys::jfloat,
+    sdk_version: jni_sys::jint,
+) {
+    // If the Choreographer is not available (e.g. OHOS), use a manual render loop
+    #[cfg(no_android_choreographer)]
+    {
+        init_simple_render_loop(device_refresh_rate);
+        return;
+    }
+    #[allow(unused)]
+    #[cfg(not(no_android_choreographer))]
+    {
+        // Otherwise use the actual Choreographer
+        CHOREOGRAPHER = ndk_sys::AChoreographer_getInstance();
+        if sdk_version >= 33 {
+            let lib = ModuleLoader::load("libandroid.so").expect("Failed to load libandroid.so");
+            let func: Option<ndk_sys::AChoreographerPostCallbackFn> = lib.get_symbol("AChoreographer_postVsyncCallback").ok();
+            CHOREOGRAPHER_POST_CALLBACK_FN = func;
+        } else if sdk_version >= 29 {
+            CHOREOGRAPHER_POST_CALLBACK_FN = Some(ndk_sys::AChoreographer_postFrameCallback64 as _);
+        } else {
+            init_simple_render_loop(device_refresh_rate);
+        }
+        post_vsync_callback();
+    }
+}
+
+#[cfg(not(no_android_choreographer))]
+unsafe extern "C" fn vsync_callback(
+    _data: *mut ndk_sys::AChoreographerFrameCallbackData,
+    _user_data: *mut std::ffi::c_void,
+) {
+    send_from_java_message(FromJavaMessage::RenderLoop);
+    post_vsync_callback();
+}
+
+#[cfg(not(no_android_choreographer))]
+pub unsafe fn post_vsync_callback() {
+    if let Some(post_callback) = CHOREOGRAPHER_POST_CALLBACK_FN {
+        if !CHOREOGRAPHER.is_null() {
+            post_callback(
+                CHOREOGRAPHER,
+                Some(vsync_callback),
+                std::ptr::null_mut(),
+            );
+        }
+    }
+}
+
+fn init_simple_render_loop(device_refresh_rate: f32) {
+    std::thread::spawn(move || {
+        let mut last_frame_time = std::time::Instant::now();
+        let target_frame_time = std::time::Duration::from_secs_f32(1.0 / device_refresh_rate);
+        loop {
+            let now = std::time::Instant::now();
+            let elapsed = now - last_frame_time;
+            
+            if elapsed >= target_frame_time {
+                let frame_start = std::time::Instant::now();
+                send_from_java_message(FromJavaMessage::RenderLoop);
+                let frame_duration = frame_start.elapsed();
+                
+                // Adaptive sleep: sleep less if the last frame took longer to process
+                if frame_duration < target_frame_time {
+                    std::thread::sleep(target_frame_time - frame_duration);
+                }
+                
+                last_frame_time = now;
+            } else {
+                std::thread::sleep(target_frame_time - elapsed);
+            }
+        }
+    });
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn Java_dev_makepad_android_MakepadNative_onAndroidParams(
     env: *mut jni_sys::JNIEnv,
@@ -165,11 +255,17 @@ pub unsafe extern "C" fn Java_dev_makepad_android_MakepadNative_onAndroidParams(
     cache_path: jni_sys::jstring,
     density: jni_sys::jfloat,
     is_emulator: jni_sys::jboolean,
+    android_version: jni_sys::jstring,
+    build_number: jni_sys::jstring,
+    kernel_version: jni_sys::jstring,
 ) {
     send_from_java_message(FromJavaMessage::Init(AndroidParams {
         cache_path: jstring_to_string(env, cache_path),
         density: density as f64,
         is_emulator: is_emulator != 0,
+        android_version: jstring_to_string(env, android_version),
+        build_number: jstring_to_string(env, build_number),
+        kernel_version: jstring_to_string(env, kernel_version),
     }));
 }
 
@@ -368,6 +464,14 @@ extern "C" fn Java_dev_makepad_android_MakepadNative_surfaceOnResizeTextIME(
 }
 
 #[no_mangle]
+extern "C" fn Java_dev_makepad_android_MakepadNative_onRenderLoop(
+    _: *mut jni_sys::JNIEnv,
+    _: jni_sys::jobject,
+) {
+    send_from_java_message(FromJavaMessage::RenderLoop);
+}
+
+#[no_mangle]
 extern "C" fn Java_dev_makepad_android_MakepadNative_onHttpResponse(
     env: *mut jni_sys::JNIEnv,
     _: jni_sys::jobject,
@@ -414,7 +518,7 @@ extern "C" fn Java_dev_makepad_android_MakepadNative_onWebSocketMessage(
     callback: jni_sys::jlong,
 ) {
     let message = unsafe { java_byte_array_to_vec(env, message) };
-    let sender = unsafe { &*(callback as *const Box<Sender<WebSocketMessage>>) };
+    let sender = unsafe { &*(callback as *const Box<(u64,Sender<WebSocketMessage>)>) };
 
     send_from_java_message(FromJavaMessage::WebSocketMessage {
         message,
@@ -428,7 +532,7 @@ extern "C" fn Java_dev_makepad_android_MakepadNative_onWebSocketClosed(
     _: jni_sys::jobject,
     callback: jni_sys::jlong,
 ) {
-    let sender = unsafe { &*(callback as *const Box<Sender<WebSocketMessage>>) };
+    let sender = unsafe { &*(callback as *const Box<(u64,Sender<WebSocketMessage>)>) };
 
     send_from_java_message(FromJavaMessage::WebSocketClosed {
         sender: sender.clone(),
@@ -437,16 +541,16 @@ extern "C" fn Java_dev_makepad_android_MakepadNative_onWebSocketClosed(
 
 #[no_mangle]
 extern "C" fn Java_dev_makepad_android_MakepadNative_onWebSocketError(
-    env: *mut jni_sys::JNIEnv,
+    _env: *mut jni_sys::JNIEnv,
     _: jni_sys::jobject,
-    error: jni_sys::jstring,
+    _error: jni_sys::jstring,
     callback: jni_sys::jlong,
 ) {
-    let error = unsafe { jstring_to_string(env, error) };
-    let sender = unsafe { &*(callback as *const Box<Sender<WebSocketMessage>>) };
+    //let error = unsafe { jstring_to_string(env, error) };
+    let sender = unsafe { &*(callback as *const Box<(u64,Sender<WebSocketMessage>)>) };
 
     send_from_java_message(FromJavaMessage::WebSocketError {
-        error,
+        error:"".to_string(),
         sender: sender.clone(),
     });
 }
@@ -645,7 +749,7 @@ pub unsafe fn to_java_http_request(request_id: LiveId, request: HttpRequest) {
 pub unsafe fn to_java_websocket_open(
     request_id: LiveId,
     request: HttpRequest,
-    recv: *const Box<std::sync::mpsc::Sender<WebSocketMessage>>
+    recv: *const Box<(u64,std::sync::mpsc::Sender<WebSocketMessage>)>
 ) {
     let env = attach_jni_env();
     let url = CString::new(request.url.clone()).unwrap();

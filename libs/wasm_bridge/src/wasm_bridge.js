@@ -1,3 +1,16 @@
+export function init_env(env) {
+    let _wasm = null;
+    
+    env.js_console_log = (u8_ptr, len) => _wasm._bridge.js_console_log(u8_ptr, len);
+    env.js_console_error = (u8_ptr, len) => _wasm._bridge.js_console_error(u8_ptr, len);
+    env.js_time_now = () => _wasm._bridge.js_time_now();
+    env.js_open_web_socket = (id, url_ptr, url_len) => console.error("js_open_web_socket out of context");
+    env.js_web_socket_send_string = (id, str_ptr, url_len) => console.error("js_web_socket_send_string out of context");
+    env.js_web_socket_send_binary = (id, bin_ptr, bin_len) => console.error("js_web_socket_send_binary out of context");
+
+    return (wasm) => { _wasm = wasm };
+}
+
 export class WasmBridge {
     constructor(wasm, dispatch) {
         this.wasm = wasm;
@@ -132,6 +145,10 @@ export class WasmBridge {
         console.error(this.u8_to_string(u8_ptr, len), '');
     }
     
+    js_time_now(){
+        return Date.now() / 1000.0;
+    }
+            
     static create_shared_memory() {
         let timeout = setTimeout(_ => {
             document.body.innerHTML = "<div style='margin-top:30px;margin-left:30px; color:white;'>Please close and re-open the browsertab - Shared memory allocation failed, this is a bug of iOS safari and apple needs to fix it.</div>"
@@ -149,22 +166,16 @@ export class WasmBridge {
             return false
         })
     }
-    
-    static instantiate_wasm(module, memory, env) {
-        let _wasm = null;
 
-        env.js_console_log = (u8_ptr, len) => _wasm._bridge.js_console_log(u8_ptr, len);
-        env.js_console_error = (u8_ptr, len) => _wasm._bridge.js_console_error(u8_ptr, len);
-        env.js_open_web_socket = (id, url_ptr, url_len) => console.error("js_open_web_socket out of context");
-        env.js_web_socket_send_string = (id, str_ptr, url_len)=> console.error("js_web_socket_send_string out of context");
-        env.js_web_socket_send_binary = (id, bin_ptr, bin_len)=> console.error("js_web_socket_send_binary out of context");
-        
+    static instantiate_wasm(module, memory, env) {
+        let set_wasm = init_env(env);
+
         if (memory !== undefined) {
             env.memory = memory;
         }
         
         return WebAssembly.instantiate(module, {env}).then(wasm => {
-            _wasm = wasm;
+            set_wasm(wasm);
             wasm._has_thread_support = env.memory !== undefined;
             wasm._memory = env.memory? env.memory: wasm.exports.memory;
             wasm._module = module;
@@ -173,7 +184,7 @@ export class WasmBridge {
             if (error.name == "LinkError") { // retry as multithreaded
                 env.memory = this.create_shared_memory();
                 return WebAssembly.instantiate(module, {env}).then(wasm => {
-                    _wasm = wasm;
+                    set_wasm(wasm);
                     wasm._has_thread_support = true;
                     wasm._memory = env.memory;
                     wasm._module = module;
@@ -228,13 +239,17 @@ export class ToWasmMsg {
     
     // i forgot how to do memcpy with typed arrays. so, we'll do this.
     push_data_u8(input_buffer) {
+        
+        
         let app = this.app;
         
         let u8_len = input_buffer.byteLength;
         let output_ptr = app.wasm_new_data_u8(u8_len);
         var u8_out = new Uint8Array(app.memory.buffer, output_ptr, u8_len)
         var u8_in = new Uint8Array(input_buffer)
+        
         u8_out.set(u8_in);
+        
         app.u32[this.u32_offset ++] = output_ptr;
         app.u32[this.u32_offset ++] = u8_len;
     }

@@ -6,13 +6,13 @@ export class WasmWebBrowser extends WasmBridge {
         if (wasm === undefined) {
             return
         }
-        
+        /*
         window.onbeforeunload = _ => {
             this.clear_memory_refs();
             for (let worker of this.workers) {
                 worker.terminate();
             }
-        }
+        }*/
         
         this.wasm_app = this.wasm_create_app();
         
@@ -79,6 +79,7 @@ export class WasmWebBrowser extends WasmBridge {
             window_info: this.window_info,
             deps: deps
         });
+        
         this.do_wasm_pump();
         // only bind the event handlers now
         // to stop them firing into wasm early
@@ -92,6 +93,18 @@ export class WasmWebBrowser extends WasmBridge {
         var loaders = document.getElementsByClassName('canvas_loader');
         for (var i = 0; i < loaders.length; i ++) {
             loaders[i].parentNode.removeChild(loaders[i])
+        }
+    }
+    
+    FromWasmOpenUrl(args){
+        if(args.in_place){
+            window.location.href = args.url;
+        }
+        else{
+            var link = document.createElement("a");
+            link.href = args.url;
+            link.target = "_blank";
+            link.click();
         }
     }
     
@@ -438,21 +451,27 @@ export class WasmWebBrowser extends WasmBridge {
     }
     
     alloc_thread_stack(context_ptr, timer) {
-        let tls_size = this.exports.__tls_size.value;
-        tls_size += 8 - (tls_size & 7); // align it to 8 bytes
-        let stack_size = this.thread_stack_size; // 8mb
-        if ((tls_size + stack_size) & 7 != 0) throw new Error("stack size not 8 byte aligned");
-        let tls_ptr = this.exports.wasm_thread_alloc_tls_and_stack((tls_size + stack_size) >> 3);
-        this.update_array_buffer_refs();
-        let stack_ptr = tls_ptr + tls_size + stack_size - 8;
-        return {
-            tls_ptr,
-            stack_ptr,
+        var ret = {
             timer,
             module: this.wasm._module,
             memory: this.wasm._memory,
             context_ptr
+        };
+        if (typeof this.exports.__wbindgen_start !== 'undefined') {
+            // ret.tls_ptr = this.exports.__stack_alloc.value;
+            ret.stack_ptr = this.exports.__stack_pointer.value;
+            ret.wasm_bindgen = true;
+        } else {
+            let tls_size = this.exports.__tls_size.value;
+            tls_size += 8 - (tls_size & 7); // align it to 8 bytes
+            let stack_size = this.thread_stack_size; // 8mb
+            if ((tls_size + stack_size) & 7 != 0) throw new Error("stack size not 8 byte aligned");
+            ret.tls_ptr = this.exports.wasm_thread_alloc_tls_and_stack((tls_size + stack_size) >> 3);
+            this.update_array_buffer_refs();
+            ret.stack_ptr = ret.tls_ptr + tls_size + stack_size - 8;
+            ret.wasm_bindgen = false;
         }
+        return ret;
     }
     
     // thanks to JP Posma with Zaplib for figuring out how to do the stack_pointer export without wasm bindgen
@@ -516,6 +535,8 @@ export class WasmWebBrowser extends WasmBridge {
             this.to_wasm.ToWasmHTTPResponse({
                 request_id_lo: args.request_id_lo,
                 request_id_hi: args.request_id_hi,
+                metadata_id_lo: args.metadata_id_lo,
+                metadata_id_hi: args.metadata_id_hi,
                 status: responseEvent.status,
                 body: responseEvent.response,
                 headers: responseEvent.getAllResponseHeaders()
@@ -620,6 +641,19 @@ export class WasmWebBrowser extends WasmBridge {
     
 
     wasm_process_msg(to_wasm) {
+        if(this.debug_sum_ptr !== undefined){
+            console.log("CECKING IN PROCESS MSG");
+            let ptr = this.debug_sum_ptr;
+            this.debug_sum_ptr = undefined;
+            var u8_out = new Uint8Array(this.memory.buffer, ptr.ptr, ptr.len);
+            let sum = 0
+            for(let i = 0; i<ptr.len;i++){
+                sum += u8_out[i];
+            }
+            console.log("Got sum"+sum);
+        }
+        
+        
         let ret_ptr = this.exports.wasm_process_msg(to_wasm.release_ownership(), this.wasm_app)
         this.update_array_buffer_refs();
         return this.new_from_wasm(ret_ptr);
@@ -914,7 +948,7 @@ export class WasmWebBrowser extends WasmBridge {
         this.handlers.on_touchstart = e => {
             e.preventDefault()
             this.to_wasm.ToWasmTouchUpdate({
-                time: e.timeStamp,
+                time: e.timeStamp / 1000.0,
                 modifiers: pack_key_modifier(e),
                 touches: touches_to_wasm_wtouches(e, 1)
             });
@@ -925,7 +959,7 @@ export class WasmWebBrowser extends WasmBridge {
         this.handlers.on_touchmove = e => {
             e.preventDefault();
             this.to_wasm.ToWasmTouchUpdate({
-                time: e.timeStamp,
+                time: e.timeStamp / 1000.0,
                 modifiers: pack_key_modifier(e),
                 touches: touches_to_wasm_wtouches(e, 2)
             });
@@ -936,7 +970,7 @@ export class WasmWebBrowser extends WasmBridge {
         this.handlers.on_touch_end_cancel_leave = e => {
             e.preventDefault();
             this.to_wasm.ToWasmTouchUpdate({
-                time: e.timeStamp,
+                time: e.timeStamp / 1000.0,
                 modifiers: pack_key_modifier(e),
                 touches: touches_to_wasm_wtouches(e, 3)
             });

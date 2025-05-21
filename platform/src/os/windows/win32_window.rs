@@ -4,6 +4,8 @@ use {
             RefCell,
             Cell,
         },
+        sync::Arc,
+        sync::Mutex,
         rc::Rc,
         ffi::OsStr,
         os::windows::ffi::OsStrExt,
@@ -13,9 +15,9 @@ use {
     crate::{
         windows::{
             core::PCWSTR,
-            core::IntoParam,
-            core::Result as coreResult,
-            core::HRESULT,
+            //core::IntoParam,
+            //core::Result as coreResult,
+            //core::HRESULT,
             Win32::{
                 Foundation::{
                     HWND,
@@ -38,8 +40,8 @@ use {
                     },
                     Ole::{
                         CF_UNICODETEXT,
-                        //RegisterDragDrop,
-                        //IDropTarget,
+                        RegisterDragDrop,
+                        IDropTarget,
                         DROPEFFECT,
                         DROPEFFECT_COPY,
                         DROPEFFECT_MOVE,
@@ -275,7 +277,7 @@ use {
         cursor::MouseCursor,
     },
 };
-
+/*
 // Copied from Microsoft so it refers to the right IDropTarget
 #[allow(non_snake_case)]
 pub unsafe fn RegisterDragDrop<P0, P1>(hwnd: P0, pdroptarget: P1) -> coreResult<()>
@@ -286,7 +288,7 @@ where
     ::windows_targets::link!("ole32.dll" "system" fn RegisterDragDrop(hwnd : HWND, pdroptarget : * mut::core::ffi::c_void) -> HRESULT);
     RegisterDragDrop(hwnd.into_param().abi(), pdroptarget.into_param().abi()).ok()
 }
-
+*/
 //#[derive(Clone)]
 pub struct Win32Window {
     pub window_id: WindowId,
@@ -665,7 +667,7 @@ impl Win32Window {
                     DropTargetMessage::Over(flags,mut point,effect,drag_item) => {
                         
                         // decode message
-                        unsafe { ScreenToClient(window.hwnd,&mut point as *mut POINTL as *mut POINT) };
+                        let _ = unsafe { ScreenToClient(window.hwnd,&mut point as *mut POINTL as *mut POINT) };
                         let response = if (effect & DROPEFFECT_LINK) != DROPEFFECT(0) { DragResponse::Link }
                         else if (effect & DROPEFFECT_MOVE) != DROPEFFECT(0) { DragResponse::Move }
                         else if (effect & DROPEFFECT_COPY) != DROPEFFECT(0) { DragResponse::Copy }
@@ -683,10 +685,10 @@ impl Win32Window {
                                         alt: false,  // TODO
                                         logo: false,  // Windows doesn't have a logo button
                                     },
-                                    handled: Cell::new(false),
+                                    handled: Arc::new(Mutex::new(false)),
                                     abs: DVec2 { x: point.x as f64 / dpi_factor,y: point.y as f64 / dpi_factor, },
-                                    items: Rc::new(vec![drag_item]),
-                                    response: Rc::new(Cell::new(response)),
+                                    items: Arc::new(vec![drag_item]),
+                                    response: Arc::new(Mutex::new(response)),
                                 }
                             )
                         );        
@@ -695,7 +697,7 @@ impl Win32Window {
                     DropTargetMessage::Drop(flags,mut point,_effect,drag_item) => {
 
                         // decode message
-                        unsafe { ScreenToClient(window.hwnd,&mut point as *mut POINTL as *mut POINT) };
+                        let _ = unsafe { ScreenToClient(window.hwnd,&mut point as *mut POINTL as *mut POINT) };
 
                         //log!("dropping at ({},{}), flags: {:04X}, response: {:?}, drag_item: {:?}",point.x,point.y,flags.0,response,drag_item);
                         let dpi_factor = window.get_dpi_factor();
@@ -710,9 +712,9 @@ impl Win32Window {
                                         alt: false,  // TODO
                                         logo: false,  // Windows doesn't have a logo button
                                     },
-                                    handled: Cell::new(false),
+                                    handled: Arc::new(Mutex::new(false)),
                                     abs: DVec2 { x: point.x as f64 / dpi_factor,y: point.y as f64 / dpi_factor, },
-                                    items: Rc::new(vec![drag_item]),
+                                    items: Arc::new(vec![drag_item]),
                                 }
                             )
                         );
@@ -782,14 +784,14 @@ impl Win32Window {
     
     pub fn restore(&self) {
         unsafe {
-            ShowWindow(self.hwnd, SW_RESTORE);
+            let _ = ShowWindow(self.hwnd, SW_RESTORE);
             PostMessageW(self.hwnd, WM_SIZE, WPARAM(0), LPARAM(0)).unwrap();
         }
     }
     
     pub fn maximize(&self) {
         unsafe {
-            ShowWindow(self.hwnd, SW_MAXIMIZE);
+            let _ = ShowWindow(self.hwnd, SW_MAXIMIZE);
             PostMessageW(self.hwnd, WM_SIZE, WPARAM(0), LPARAM(0)).unwrap();
         }
     }
@@ -802,13 +804,13 @@ impl Win32Window {
     
     pub fn show(&self) {
         unsafe {
-            ShowWindow(self.hwnd, SW_SHOW);
+            let _ = ShowWindow(self.hwnd, SW_SHOW);
         }
     }
     
     pub fn minimize(&self) {
         unsafe {
-            ShowWindow(self.hwnd, SW_MINIMIZE);
+            let _ = ShowWindow(self.hwnd, SW_MINIMIZE);
         }
     }
     

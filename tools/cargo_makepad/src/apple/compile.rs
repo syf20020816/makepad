@@ -27,7 +27,7 @@ impl ParsedProfiles{
         None
     }
     
-    fn cert<'a>(&'a self, v:&'a str)->Option<&str>{
+    fn cert<'a>(&'a self, v:&'a str)->Option<&'a str>{
         for cert in &self.certs{
             if cert.0.starts_with(v){
                 return Some(&cert.0)
@@ -36,7 +36,7 @@ impl ParsedProfiles{
         Some(v)
     }
     
-    fn device<'a>(&'a self, v:&'a str)->Option<&str>{
+    fn device<'a>(&'a self, v:&'a str)->Option<&'a str>{
         for device in &self.devices{
             if device.0 == v{
                 return Some(&device.1)
@@ -318,7 +318,7 @@ pub struct IosBuildResult {
 }
 
 
-pub fn build(org: &str, product: &str, args: &[String], apple_target: AppleTarget) -> Result<IosBuildResult, String> {
+pub fn build(stable:bool, org: &str, product: &str, args: &[String], apple_target: AppleTarget) -> Result<IosBuildResult, String> {
     let build_crate = get_build_crate_from_args(args) ?;
     
     let cwd = std::env::current_dir().unwrap();
@@ -326,7 +326,7 @@ pub fn build(org: &str, product: &str, args: &[String], apple_target: AppleTarge
     
     let base_args = &[
         "run",
-        "nightly", 
+        if stable{"stable"}else{"nightly"}, 
         "cargo",
         "build",
         &target_opt,
@@ -343,7 +343,7 @@ pub fn build(org: &str, product: &str, args: &[String], apple_target: AppleTarge
         args_out.push("build-std=std");
     }
     
-    shell_env(&[("MAKEPAD", "lines"),], &cwd, "rustup", &args_out) ?;
+    shell_env(if stable{&[("MAKEPAD", "")]}else{&[("MAKEPAD", "lines")]}, &cwd, "rustup", &args_out) ?;
     
     // alright lets make the .app file with manifest
     let plist = PlistValues {
@@ -380,7 +380,7 @@ pub fn run_on_sim(apple_args: AppleArgs, args: &[String], apple_target: AppleTar
         return Err("Please set --org=org --app=app on the commandline inbetween ios and run-sim.".to_string());
     }
     
-    let result = build(&apple_args.org.unwrap_or("orgname".to_string()), &apple_args.app.unwrap_or("productname".to_string()), args, apple_target) ?;
+    let result = build(apple_args.stable, &apple_args.org.unwrap_or("orgname".to_string()), &apple_args.app.unwrap_or("productname".to_string()), args, apple_target) ?;
     
     let cwd = std::env::current_dir().unwrap();
     shell_env(&[], &cwd, "xcrun", &[
@@ -611,7 +611,8 @@ fn copy_resources(app_dir: &Path, build_crate: &str, build_dir:&Path, apple_targ
 }
 
 pub struct AppleArgs {
-    pub apple_os: AppleOs,
+    pub stable: bool,
+    pub _apple_os: AppleOs,
     pub signing_identity: Option<String>,
     pub provisioning_profile: Option<String>,
     pub device_identifier: Option<String>,
@@ -637,7 +638,7 @@ pub fn run_on_device(apple_args: AppleArgs, args: &[String], apple_target: Apple
                 let v = parsed.profile(v).expect("cannot find provisioning profile");
                 ProvisionData::parse(&PathBuf::from(format!("{}{}.mobileprovision", profile_dir, v)))
             }
-        }
+            }
     );
     
     if provision.is_none() || apple_args.provisioning_profile.is_none() || apple_args.signing_identity.is_none() || apple_args.device_identifier.is_none(){
@@ -652,7 +653,7 @@ pub fn run_on_device(apple_args: AppleArgs, args: &[String], apple_target: Apple
     let app = apple_args.app.unwrap();
     
     let build_crate = get_build_crate_from_args(args) ?;
-    let result = build(&org, &app, args, apple_target) ?;
+    let result = build(apple_args.stable, &org, &app, args, apple_target) ?;
    
     let scent = Scent {
         app_id: format!("{}.{}.{}", provision.team_ident, org, app),

@@ -17,10 +17,12 @@ Cargo.lock
 *.bat
 mandelbrot_presets.json
 makepad_settings.ron
-makepad_state.ron
+makepad_state*.ron
 key.ron
 .vscode
 rustc*.txt
+
+OPENAI_KEY
 
 /local
 

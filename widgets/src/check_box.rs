@@ -46,9 +46,10 @@ pub struct CheckBox {
     #[live] draw_text: DrawText,
     #[live] draw_icon: DrawIcon,
     
-    #[live] text: RcStringMut,
+    #[live] text: ArcStringMut,
     
     #[live] bind: String,
+    #[action_data] #[rust] action_data: WidgetActionData,
 }
 
 #[derive(Clone, Debug, DefaultNone)]
@@ -56,13 +57,13 @@ pub enum CheckBoxAction {
     Change(bool),
     None
 }
-
+/*
 #[derive(Live, LiveHook, LiveRegister)]#[repr(C)]
 struct DrawLabelText {
     #[deref] draw_super: DrawText,
     #[live] hover: f32,
     #[live] pressed: f32,
-}
+}*/
 
 impl CheckBox {
     
@@ -109,11 +110,11 @@ impl Widget for CheckBox {
             Hit::FingerDown(_fe) => {
                 if self.animator_in_state(cx, id!(selected.on)) {
                     self.animator_play(cx, id!(selected.off));
-                    cx.widget_action(uid, &scope.path, CheckBoxAction::Change(false));
+                    cx.widget_action_with_data(&self.action_data, uid, &scope.path, CheckBoxAction::Change(false));
                 }
                 else {
                     self.animator_play(cx, id!(selected.on));
-                    cx.widget_action(uid, &scope.path, CheckBoxAction::Change(true));
+                    cx.widget_action_with_data(&self.action_data, uid, &scope.path, CheckBoxAction::Change(true));
                 }
             },
             Hit::FingerUp(_fe) => {

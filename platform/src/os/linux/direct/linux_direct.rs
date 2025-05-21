@@ -1,5 +1,6 @@
 use {
     std::rc::Rc,
+    std::time::Instant,
     std::cell::RefCell,
     self::super::{
         direct_event::*,
@@ -12,10 +13,10 @@ use {
         linux_media::CxLinuxMedia
     },
     crate::{
-        cx_api::{CxOsOp, CxOsApi},
+        cx_api::{CxOsOp, CxOsApi, OpenUrlInPlace},
         makepad_live_id::*,
         makepad_math::*,
-        thread::Signal,
+        thread::SignalToUI,
         event::{
             TimerEvent,
             Event,
@@ -146,7 +147,7 @@ impl Cx {
                     e.abs,
                     e.time
                 );
-                self.fingers.mouse_down(e.button);
+                self.fingers.mouse_down(e.button, CxWindowPool::id_zero());
                 self.call_event_handler(&Event::MouseDown(e.into()))
             }
             DirectEvent::MouseMove(e) => {
@@ -176,13 +177,19 @@ impl Cx {
             }
             DirectEvent::Timer(e) => {
                 if e.timer_id == 0 {
-                    if Signal::check_and_clear_ui_signal() {
+                    if SignalToUI::check_and_clear_ui_signal() {
                         self.handle_media_signals();
                         self.call_event_handler(&Event::Signal);
                     }
+                    self.handle_action_receiver();
                 }
                 else {
                     self.call_event_handler(&Event::Timer(e))
+                }
+
+                if self.handle_live_edit() {
+                    self.call_event_handler(&Event::LiveEdit);
+                    self.redraw_all();
                 }
             }
         }
@@ -307,6 +314,9 @@ impl Cx {
 impl CxOsApi for Cx {
     fn init_cx_os(&mut self) {
         self.live_expand();
+        if !Self::has_studio_web_socket() {
+            self.start_disk_live_file_watcher(100);
+        }
         self.live_scan_dependencies();
         self.native_load_dependencies();
     }
@@ -314,10 +324,27 @@ impl CxOsApi for Cx {
     fn spawn_thread<F>(&mut self, f: F) where F: FnOnce() + Send + 'static {
         std::thread::spawn(f);
     }
+    
+    fn open_url(&mut self, _url:&str, _in_place:OpenUrlInPlace){
+        crate::error!("open_url not implemented on this platform");
+    }
+    
+    fn seconds_since_app_start(&self)->f64{
+        Instant::now().duration_since(self.os.start_time).as_secs_f64()
+    }
+        
 }
 
-#[derive(Default)]
 pub struct CxOs {
     pub (crate) media: CxLinuxMedia,
+    pub (crate) start_time: Instant,
 }
 
+impl Default for CxOs {
+    fn default() -> Self {
+        Self {
+            start_time: Instant::now(),
+            media: Default::default()
+        }
+    }
+}

@@ -21,7 +21,7 @@ use {
         },
         makepad_math::*,
         pass::CxPassParent,
-        cx_api::{CxOsApi, CxOsOp},
+        cx_api::{CxOsApi, CxOsOp, OpenUrlInPlace},
         window::CxWindowPool,
         windows::Win32::Graphics::Direct3D11::ID3D11Device,
     }
@@ -78,23 +78,12 @@ impl Cx {
         }
         
         let mut paint_dirty = false;
-        match &event{
+        /*match &event{
             Win32Event::Timer(time) =>{
-                if time.timer_id == 0{
-                    if SignalToUI::check_and_clear_ui_signal() {
-                        self.handle_media_signals();
-                        self.call_event_handler(&Event::Signal);
-                    }
-                    if self.handle_live_edit() {
-                        self.call_event_handler(&Event::LiveEdit);
-                        self.redraw_all();
-                    }
-                    self.handle_networking_events();
-                    return EventFlow::Poll;
-                }
+                
             }
             _=>{}
-        }
+        }*/
 
         //self.process_desktop_pre_event(&mut event);
         match event {
@@ -246,6 +235,13 @@ impl Cx {
                     self.handle_media_signals();
                     self.call_event_handler(&Event::Signal);
                 }
+                self.handle_action_receiver();
+                if self.handle_live_edit() {
+                    self.call_event_handler(&Event::LiveEdit);
+                    self.redraw_all();
+                }
+                self.handle_networking_events();
+                return EventFlow::Poll;
             }
         }
         
@@ -283,11 +279,19 @@ impl Cx {
         }
     }
     
-    pub (crate) fn handle_networking_events(&mut self) {
+    pub(crate) fn handle_networking_events(&mut self) {
+        let mut out = Vec::new();
+        while let Ok(event) = self.os.network_response.receiver.try_recv(){
+            out.push(event);
+        }
+        if out.len()>0{
+            self.call_event_handler(& Event::NetworkResponses(out))
+        }
     }
     
     fn handle_platform_ops(&mut self, d3d11_windows: &mut Vec<D3d11Window>, d3d11_cx: &D3d11Cx) -> EventFlow {
         let mut ret = EventFlow::Poll;
+        let mut geom_changes = Vec::new();
         while let Some(op) = self.platform_ops.pop() {
             match op {
                 CxOsOp::CreateWindow(window_id) => {
@@ -303,6 +307,11 @@ impl Cx {
                     window.window_geom = d3d11_window.window_geom.clone();
                     d3d11_windows.push(d3d11_window);
                     window.is_created = true;
+                    geom_changes.push(WindowGeomChangeEvent{
+                        window_id,
+                        old_geom: window.window_geom.clone(),
+                        new_geom: window.window_geom.clone()
+                    });
                 },
                 CxOsOp::CloseWindow(window_id) => {
                     if let Some(index) = d3d11_windows.iter().position( | w | w.window_id == window_id) {
@@ -380,9 +389,15 @@ impl Cx {
                 },
                 CxOsOp::UpdateMacosMenu(_menu) => {
                 },
-                CxOsOp::HttpRequest {request_id: _, request: _} => {
-                    todo!("HttpRequest not implemented yet on windows, we'll get there");
+                CxOsOp::HttpRequest {request_id, request} => {
+                    use crate::os::windows::http::WindowsHttpSocket;
+                    WindowsHttpSocket::open(request_id, request, self.os.network_response.sender.clone());
+
+                    //todo!("HttpRequest not implemented yet on windows, we'll get there");
                 },
+                CxOsOp::CancelHttpRequest {request_id:_} => {
+                    todo!();
+                }
                 CxOsOp::PrepareVideoPlayback(_, _, _, _, _) => todo!(),
                 CxOsOp::BeginVideoPlayback(_) => todo!(),
                 CxOsOp::PauseVideoPlayback(_) => todo!(),
@@ -397,6 +412,12 @@ impl Cx {
                 CxOsOp::SelectFolderDialog(_) =>  todo!(),
             }
         }
+        if geom_changes.len()>0{
+            self.redraw_all();
+            for geom_change in geom_changes{
+                self.call_event_handler(&Event::WindowGeomChange(geom_change));
+            }
+        }
         ret
     }
 }
@@ -404,6 +425,10 @@ impl Cx {
 impl CxOsApi for Cx {
     fn init_cx_os(&mut self) {
         self.os.start_time = Some(Instant::now());
+        if let Some(item) = std::option_env!("MAKEPAD_PACKAGE_DIR"){
+            self.live_registry.borrow_mut().package_root = Some(item.to_string());
+        }
+        
         self.live_expand();
         if std::env::args().find( | v | v == "--stdin-loop").is_none() {
             self.start_disk_live_file_watcher(100);
@@ -419,6 +444,10 @@ impl CxOsApi for Cx {
     fn seconds_since_app_start(&self)->f64{
         Instant::now().duration_since(self.os.start_time.unwrap()).as_secs_f64()
     }
+    
+    fn open_url(&mut self, _url:&str, _in_place:OpenUrlInPlace){
+        crate::error!("open_url not implemented on this platform");
+    }
 }
 
 #[derive(Default)]
@@ -426,5 +455,6 @@ pub struct CxOs {
     pub (crate) start_time: Option<Instant>,
     pub (crate) media: CxWindowsMedia,
     pub (crate) d3d11_device: Option<ID3D11Device>,
-   //pub (crate) new_frame_being_rendered: Option<crate::cx_stdin::PresentableDraw>,
+    pub (crate) network_response: NetworkResponseChannel,
+    //pub (crate) new_frame_being_rendered: Option<crate::cx_stdin::PresentableDraw>,
 }

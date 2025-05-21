@@ -38,14 +38,14 @@ impl ScrollBars {
         self.scroll
     }
 
-    pub fn handle_event(&mut self, cx: &mut Cx, event: &Event)->Vec<ScrollBarsAction> {
+    pub fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope:&mut Scope)->Vec<ScrollBarsAction> {
         let mut actions = Vec::new();
-        self.handle_main_event(cx, event, &mut actions);
-        self.handle_scroll_event(cx, event, &mut actions);
+        self.handle_main_event(cx, event, scope, &mut actions);
+        self.handle_scroll_event(cx, event, scope, &mut actions);
         actions
     }
     
-    pub fn handle_main_event(&mut self, cx: &mut Cx, event: &Event,  actions: &mut Vec<ScrollBarsAction> ) {
+    pub fn handle_main_event(&mut self, cx: &mut Cx, event: &Event, _scope:&mut Scope, actions: &mut Vec<ScrollBarsAction> ) {
         if let Event::Trigger(te) = event{
             if let Some(triggers) = te.triggers.get(&self.area){
                 if let Some(trigger) = triggers.iter().find(|t| t.id == live_id!(scroll_focus_nav)){
@@ -88,7 +88,7 @@ impl ScrollBars {
         }
     }
     
-    pub fn handle_scroll_event(&mut self, cx: &mut Cx, event: &Event, actions: &mut Vec<ScrollBarsAction> ) {
+    pub fn handle_scroll_event(&mut self, cx: &mut Cx, event: &Event, _scope: &mut Scope, actions: &mut Vec<ScrollBarsAction> ) {
         
         if self.show_scroll_x {
             let mut ret_x = None;
@@ -250,7 +250,8 @@ impl ScrollBars {
     
     pub fn end_nav_area(&mut self, cx: &mut Cx2d) {
         if !self.area.is_valid(cx) {
-            panic!("Call set area before end_nav_area")
+            error!("Call set area before end_nav_area");
+            return
         }
         cx.add_end_scroll(self.nav_scroll_index.take().unwrap(), self.area);
     }

@@ -98,6 +98,12 @@ pub struct FromWasmTextCopyResponse {
 }
 
 #[derive(FromWasm)]
+pub struct FromWasmOpenUrl {
+    pub url: String,
+    pub in_place: bool
+}
+
+#[derive(FromWasm)]
 pub struct FromWasmShowTextIME {
     pub x: f64,
     pub y: f64
@@ -164,7 +170,11 @@ pub struct FromWasmHTTPRequest {
     pub body: WasmDataU8,
 }
 
-
+#[derive(FromWasm)]
+pub struct FromWasmCancelHTTPRequest {
+    pub request_id_lo: u32,
+    pub request_id_hi: u32,
+}
 
 // WebGL API
 

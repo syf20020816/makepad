@@ -11,6 +11,7 @@ use {
         cell::RefCell,
     },
     crate::{
+        action::{ActionSendSync,ACTION_SENDER_GLOBAL},
         makepad_live_compiler::{
             LiveRegistry,
             LiveFileChange
@@ -38,7 +39,7 @@ use {
         draw_list::CxDrawListPool,
         web_socket::WebSocket,
         pass::CxPassPool,
-        texture::{CxTexturePool,TextureFormat,Texture},
+        texture::{CxTexturePool,TextureFormat,Texture,TextureUpdated},
         geometry::{
             Geometry,
             CxGeometryPool,
@@ -53,7 +54,7 @@ use {
 pub struct Cx {
     pub (crate) os_type: OsType,
     pub (crate) in_makepad_studio: bool,
-   
+    pub demo_time_repaint: bool,
     pub (crate) gpu_info: GpuInfo,
     pub (crate) xr_capabilities: XrCapabilities,
     pub (crate) cpu_cores: usize,
@@ -68,7 +69,7 @@ pub struct Cx {
     
     pub draw_shaders: CxDrawShaders,
     
-    pub (crate) new_draw_event: DrawEvent,
+    pub new_draw_event: DrawEvent,
     
     pub redraw_id: u64,
     
@@ -86,7 +87,7 @@ pub struct Cx {
     
     pub (crate) new_next_frames: HashSet<NextFrame>,
     
-    pub (crate) new_actions: ActionsBuf,
+    pub new_actions: ActionsBuf,
     
     pub (crate) dependencies: HashMap<String, CxDependency>,
     
@@ -96,7 +97,9 @@ pub struct Cx {
 
     pub (crate) live_file_change_receiver: std::sync::mpsc::Receiver<Vec<LiveFileChange>>,
     pub (crate) live_file_change_sender: std::sync::mpsc::Sender<Vec<LiveFileChange >>,
-
+    
+    pub (crate) action_receiver: std::sync::mpsc::Receiver<ActionSendSync>,
+    
     pub shader_registry: ShaderRegistry,
     
     pub os: CxOs,
@@ -130,6 +133,19 @@ pub struct AndroidParams {
     pub cache_path: String,
     pub density: f64,
     pub is_emulator: bool,
+    pub android_version: String,
+    pub build_number: String,
+    pub kernel_version: String
+}
+
+#[derive(Clone, Debug)]
+pub struct OpenHarmonyParams {
+    pub files_dir:String,
+    pub cache_dir:String,
+    pub temp_dir:String,
+    pub device_type: String,
+    pub os_full_name: String,
+    pub display_density: f64,
 }
 
 #[derive(Clone, Debug)]
@@ -154,6 +170,7 @@ pub enum OsType {
     Macos,
     Ios,
     Android(AndroidParams),
+    OpenHarmony(OpenHarmonyParams),
     LinuxWindow (LinuxWindowParams),
     LinuxDirect,
     Web(WebParams)
@@ -187,6 +204,9 @@ impl OsType {
         if let OsType::Android(params) = self {
             Some(params.cache_path.clone())
         }
+        else if let OsType::OpenHarmony(params) = self {
+            Some(params.cache_dir.clone())
+        }
         else {
             None
         }
@@ -202,12 +222,19 @@ impl Cx {
         let null_texture = textures.alloc(TextureFormat::VecBGRAu8_32 {
             width: 4,
             height: 4,
-            data: vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+            data: Some(vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+            updated: TextureUpdated::Full,
         });
         
         let (executor, spawner) = executor::new_executor_and_spawner();
-        let (send, recv) = std::sync::mpsc::channel();
+        let (live_file_change_sender, live_file_change_receiver) = std::sync::mpsc::channel();
+        let (action_sender, action_receiver) = std::sync::mpsc::channel();
+        if let Ok(mut sender) = ACTION_SENDER_GLOBAL.lock(){
+            *sender = Some(action_sender);
+        }
+        
         Self {
+            demo_time_repaint: false,
             null_texture,
             cpu_cores: 8,
             in_makepad_studio: false,
@@ -249,10 +276,11 @@ impl Cx {
             
             live_registry: Rc::new(RefCell::new(LiveRegistry::default())),
             
-            live_file_change_receiver: recv,
-            live_file_change_sender: send,
+            live_file_change_receiver,
+            live_file_change_sender,
+            action_receiver,
             
-            shader_registry: ShaderRegistry::new(),
+            shader_registry: ShaderRegistry::new(true),
             
             os: CxOs::default(),
             

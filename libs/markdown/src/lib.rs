@@ -29,10 +29,10 @@ pub enum MarkdownNode{
     Separator, 
     BeginUnderline,
     EndUnderline,
-    BeginCode,
+    BeginCode{lang_start:usize, lang_end:usize},
     EndCode,
     BeginInlineCode,
-    NewLine,
+    NewLine{paragraph:bool},
     EndInlineCode,
     BeginBold,
     BeginItalic,
@@ -145,10 +145,10 @@ pub fn parse_markdown(body:&str)->MarkdownDoc{
             cursor.next();
         }
         if !already_in_code{
-            nodes.push(MarkdownNode::BeginCode);
+            nodes.push(MarkdownNode::BeginCode{lang_start:decoded.len(), lang_end:decoded.len()});
         }
         else{
-            nodes.push(MarkdownNode::NewLine);
+            nodes.push(MarkdownNode::NewLine{paragraph: false});
         }
         nodes.push(MarkdownNode::Text{start, end:decoded.len()});
         nodes.push(MarkdownNode::EndCode);
@@ -158,7 +158,7 @@ pub fn parse_markdown(body:&str)->MarkdownDoc{
         match &mut state{
             State::Inline{kind, bold, italic, underline}=> match cursor.chars{
                 [' ',' ','\n']=>{
-                    nodes.push(MarkdownNode::NewLine);
+                    nodes.push(MarkdownNode::NewLine{paragraph: true});
                     cursor.skip(2);
                 }
                 ['\n',_,_] | ['\0',_,_]=>{
@@ -556,11 +556,21 @@ pub fn parse_markdown(body:&str)->MarkdownDoc{
                 }
                 ['`','`','`']=>{ // begins or ends blocks of code. 
                     cursor.skip(3);
-                    nodes.push(MarkdownNode::BeginCode);
+                    // lets parse the language
+                    let start = decoded.len();
+                    while cursor.chars[0] != '\n' && !cursor.at_end(){
+                        push_char(&mut nodes, &mut decoded, cursor.chars[0]);
+                        cursor.skip(1);
+                    }
+                    if cursor.chars[0] == '\n'{
+                        cursor.skip(1);
+                    }
+                    nodes.push(MarkdownNode::BeginCode{lang_start:start, lang_end:decoded.len()});
+                                        
                     let start = decoded.len();
                     while cursor.chars != ['`','`','`'] && !cursor.at_end(){
                         if cursor.chars[0] == '\n' && start != decoded.len(){
-                            nodes.push(MarkdownNode::NewLine);
+                            nodes.push(MarkdownNode::NewLine{paragraph: false});
                         }
                         else{
                             push_char(&mut nodes, &mut decoded, cursor.chars[0]);
@@ -571,7 +581,7 @@ pub fn parse_markdown(body:&str)->MarkdownDoc{
                         cursor.skip(3);
                     }
                     // remove last newline
-                    if let Some(MarkdownNode::NewLine) = nodes.last(){
+                    if let Some(MarkdownNode::NewLine{..}) = nodes.last(){
                         nodes.pop();
                     }
                     nodes.push(MarkdownNode::EndCode);
@@ -610,9 +620,9 @@ pub fn parse_markdown(body:&str)->MarkdownDoc{
                             _=>panic!()
                         }});
                         
-                        state = State::Inline{kind:Kind::List(depth), bold:0, italic:0, underline:0}
+                        state = State::Inline{kind:Kind::List(depth), bold:0, italic:0, underline:0};
+                        cursor.skip(2);
                     }
-                    cursor.skip(2);
                     //push_optional_char(&mut nodes, &mut decoded, ' ');
                 }
                 ['\n',_,_]=>{ // skip it

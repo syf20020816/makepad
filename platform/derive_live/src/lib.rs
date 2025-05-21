@@ -39,6 +39,7 @@ use crate::derive_live_registry::*;
     walk,
     layout,
     deref,
+    designable,
     live_ignore,
     live_debug
 ))]
@@ -83,6 +84,11 @@ pub fn generate_any_trait_api(input: TokenStream) -> TokenStream {
 }
 
 #[proc_macro]
+pub fn generate_any_send_trait_api(input: TokenStream) -> TokenStream {
+    generate_any_send_trait_api_impl(input)
+}
+
+#[proc_macro]
 pub fn live_design(input: TokenStream) -> TokenStream {
     live_design_impl(input)
 }
@@ -95,5 +101,10 @@ pub fn derive_live_component_registry(input: TokenStream) -> TokenStream {
 #[proc_macro_derive(LiveAtomic)]
 pub fn derive_live_atomic(input: TokenStream) -> TokenStream {
     derive_live_atomic_impl(input)
+}
+
+#[proc_macro_derive(DefaultNone)] 
+pub fn derive_widget_action(input: TokenStream) -> TokenStream {
+    derive_default_none_impl(input)
 }
 
