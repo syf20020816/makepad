@@ -13,7 +13,7 @@ use std::sync::Arc;
 pub use makepad_zune_png::error::PngDecodeErrors;
 pub use makepad_zune_jpeg::errors::DecodeErrors as JpgDecodeErrors;
 
-#[derive(Live, LiveHook, Clone, Copy)]
+#[derive(Live, LiveHook, Clone, Copy, Debug)]
 #[live_ignore]
 pub enum ImageFit {
     #[pick] Stretch,
@@ -237,7 +237,7 @@ pub struct AsyncImageLoad{
 }
 
 pub struct ImageCache {
-    map: HashMap<PathBuf, ImageCacheEntry>,
+    pub map: HashMap<PathBuf, ImageCacheEntry>,
     pub thread_pool: Option<TagThreadPool<PathBuf>>,
 }
 

@@ -43,6 +43,11 @@ pub trait WidgetNode: LiveApply {
         
     fn set_visible(&mut self, _cx:&mut Cx, _visible:bool){}
     fn visible(&self) -> bool {true}
+    fn state(&self) -> String {"Basic".to_string()}
+
+    fn animation_spread(&self) -> bool {
+        false
+    }
 }
 
 pub trait Widget: WidgetNode {
