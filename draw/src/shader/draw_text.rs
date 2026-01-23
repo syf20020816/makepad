@@ -519,7 +519,7 @@ pub struct TextStyle {
 #[derive(Debug, Clone, Live, LiveRegister, PartialEq)]
 pub struct FontFamily {
     #[rust]
-    id: LiveId,
+    pub id: LiveId,
 }
 
 impl FontFamily {
